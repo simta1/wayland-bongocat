@@ -429,4 +429,4 @@ This project is open source and available under a permissive license. Feel free 
 
 **Built with ❤️ for the Wayland community**
 
-_Bongo Cat Overlay v1.0_
+_Bongo Cat Overlay v1.1.0_
