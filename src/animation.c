@@ -4,6 +4,7 @@
 #include "wayland.h"
 #include "input.h"
 #include "memory.h"
+#include "embedded_assets.h"
 #include <time.h>
 
 // Animation globals
@@ -120,13 +121,32 @@ bongocat_error_t animation_init(config_t *config) {
     
     bongocat_log_info("Initializing animation system");
     
-    // Load animation frames
+    // Load embedded animation frames
+    const unsigned char *embedded_data[] = {
+        bongo_cat_both_up_png,
+        bongo_cat_left_down_png,
+        bongo_cat_right_down_png
+    };
+    
+    const size_t embedded_sizes[] = {
+        bongo_cat_both_up_png_size,
+        bongo_cat_left_down_png_size,
+        bongo_cat_right_down_png_size
+    };
+    
+    const char *frame_names[] = {
+        "embedded bongo-cat-both-up.png",
+        "embedded bongo-cat-left-down.png", 
+        "embedded bongo-cat-right-down.png"
+    };
+    
     for (int i = 0; i < NUM_FRAMES; i++) {
-        bongocat_log_debug("Loading image: %s", config->asset_paths[i]);
+        bongocat_log_debug("Loading embedded image: %s", frame_names[i]);
         
-        anim_imgs[i] = stbi_load(config->asset_paths[i], &anim_width[i], &anim_height[i], NULL, 4);
+        anim_imgs[i] = stbi_load_from_memory(embedded_data[i], embedded_sizes[i], 
+                                           &anim_width[i], &anim_height[i], NULL, 4);
         if (!anim_imgs[i]) {
-            bongocat_log_error("Failed to load image: %s", config->asset_paths[i]);
+            bongocat_log_error("Failed to load embedded image: %s", frame_names[i]);
             
             // Cleanup already loaded images
             for (int j = 0; j < i; j++) {
@@ -138,10 +158,10 @@ bongocat_error_t animation_init(config_t *config) {
             return BONGOCAT_ERROR_FILE_IO;
         }
         
-        bongocat_log_debug("Loaded %dx%d image", anim_width[i], anim_height[i]);
+        bongocat_log_debug("Loaded %dx%d embedded image", anim_width[i], anim_height[i]);
     }
     
-    bongocat_log_info("Animation system initialized successfully");
+    bongocat_log_info("Animation system initialized successfully with embedded assets");
     return BONGOCAT_SUCCESS;
 }
 

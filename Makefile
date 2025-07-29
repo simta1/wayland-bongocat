@@ -35,9 +35,14 @@ INCDIR = include
 OBJDIR = obj
 PROTOCOLDIR = protocols
 
-# Source files
-SOURCES = $(wildcard $(SRCDIR)/*.c)
-OBJECTS = $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
+# Source files (excluding embedded assets which is generated)
+SOURCES = $(filter-out $(EMBEDDED_ASSETS_C), $(wildcard $(SRCDIR)/*.c))
+OBJECTS = $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o) $(OBJDIR)/embedded_assets.o
+
+# Embedded assets
+EMBED_SCRIPT = scripts/embed_assets.sh
+EMBEDDED_ASSETS_H = $(INCDIR)/embedded_assets.h
+EMBEDDED_ASSETS_C = $(SRCDIR)/embedded_assets.c
 
 # Protocol files
 C_PROTOCOL_SRC = $(PROTOCOLDIR)/zwlr-layer-shell-v1-protocol.c $(PROTOCOLDIR)/xdg-shell-protocol.c
@@ -47,19 +52,25 @@ PROTOCOL_OBJECTS = $(C_PROTOCOL_SRC:$(PROTOCOLDIR)/%.c=$(OBJDIR)/%.o)
 # Target executable
 TARGET = bongocat
 
-.PHONY: all clean protocols
+.PHONY: all clean protocols embed-assets
 
-all: protocols $(TARGET)
+all: protocols embed-assets $(TARGET)
 
 # Generate protocol files first
 protocols: $(C_PROTOCOL_SRC) $(H_PROTOCOL_HDR)
+
+# Generate embedded assets
+embed-assets: $(EMBEDDED_ASSETS_H) $(EMBEDDED_ASSETS_C)
+
+$(EMBEDDED_ASSETS_H) $(EMBEDDED_ASSETS_C): $(EMBED_SCRIPT) assets/*.png
+	./$(EMBED_SCRIPT)
 
 # Create object directory
 $(OBJDIR):
 	mkdir -p $(OBJDIR)
 
-# Compile source files (depends on protocol headers)
-$(OBJDIR)/%.o: $(SRCDIR)/%.c $(H_PROTOCOL_HDR) | $(OBJDIR)
+# Compile source files (depends on protocol headers and embedded assets)
+$(OBJDIR)/%.o: $(SRCDIR)/%.c $(H_PROTOCOL_HDR) $(EMBEDDED_ASSETS_H) | $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Compile protocol files
@@ -77,7 +88,7 @@ $(C_PROTOCOL_SRC) $(H_PROTOCOL_HDR): $(PROTOCOLDIR)/wlr-layer-shell-unstable-v1.
 	wayland-scanner client-header $(PROTOCOLDIR)/wlr-layer-shell-unstable-v1.xml $(PROTOCOLDIR)/zwlr-layer-shell-v1-client-protocol.h
 
 clean:
-	rm -rf $(OBJDIR) $(TARGET) $(C_PROTOCOL_SRC) $(H_PROTOCOL_HDR)
+	rm -rf $(OBJDIR) $(TARGET) $(C_PROTOCOL_SRC) $(H_PROTOCOL_HDR) $(EMBEDDED_ASSETS_H) $(EMBEDDED_ASSETS_C)
 
 # Development targets
 debug:
