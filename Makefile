@@ -1,0 +1,110 @@
+# Compiler
+CC = gcc
+
+# Build type (debug or release)
+BUILD_TYPE ?= release
+
+# Base flags
+BASE_CFLAGS = -std=c11 -Iinclude -Ilib -Iprotocols
+BASE_CFLAGS += -Wall -Wextra -Wpedantic -Wformat=2 -Wstrict-prototypes
+BASE_CFLAGS += -Wmissing-prototypes -Wold-style-definition -Wredundant-decls
+BASE_CFLAGS += -Wnested-externs -Wmissing-include-dirs -Wlogical-op
+BASE_CFLAGS += -Wjump-misses-init -Wdouble-promotion -Wshadow
+BASE_CFLAGS += -fstack-protector-strong -D_FORTIFY_SOURCE=2
+
+# Debug flags
+DEBUG_CFLAGS = $(BASE_CFLAGS) -g3 -O0 -DDEBUG -fsanitize=address -fsanitize=undefined
+DEBUG_LDFLAGS = -fsanitize=address -fsanitize=undefined
+
+# Release flags  
+RELEASE_CFLAGS = $(BASE_CFLAGS) -O3 -DNDEBUG -flto -march=native
+RELEASE_CFLAGS += -fomit-frame-pointer -funroll-loops -finline-functions
+
+# Set flags based on build type
+ifeq ($(BUILD_TYPE),debug)
+    CFLAGS = $(DEBUG_CFLAGS)
+    LDFLAGS = -lwayland-client -lm -lpthread $(DEBUG_LDFLAGS)
+else
+    CFLAGS = $(RELEASE_CFLAGS)
+    LDFLAGS = -lwayland-client -lm -lpthread -flto
+endif
+
+# Directories
+SRCDIR = src
+INCDIR = include
+OBJDIR = obj
+PROTOCOLDIR = protocols
+
+# Source files
+SOURCES = $(wildcard $(SRCDIR)/*.c)
+OBJECTS = $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
+
+# Protocol files
+C_PROTOCOL_SRC = $(PROTOCOLDIR)/zwlr-layer-shell-v1-protocol.c $(PROTOCOLDIR)/xdg-shell-protocol.c
+H_PROTOCOL_HDR = $(PROTOCOLDIR)/zwlr-layer-shell-v1-client-protocol.h $(PROTOCOLDIR)/xdg-shell-client-protocol.h
+PROTOCOL_OBJECTS = $(C_PROTOCOL_SRC:$(PROTOCOLDIR)/%.c=$(OBJDIR)/%.o)
+
+# Target executable
+TARGET = bongocat
+
+.PHONY: all clean protocols
+
+all: protocols $(TARGET)
+
+# Generate protocol files first
+protocols: $(C_PROTOCOL_SRC) $(H_PROTOCOL_HDR)
+
+# Create object directory
+$(OBJDIR):
+	mkdir -p $(OBJDIR)
+
+# Compile source files (depends on protocol headers)
+$(OBJDIR)/%.o: $(SRCDIR)/%.c $(H_PROTOCOL_HDR) | $(OBJDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Compile protocol files
+$(OBJDIR)/%.o: $(PROTOCOLDIR)/%.c | $(OBJDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(TARGET): $(OBJECTS) $(PROTOCOL_OBJECTS)
+	$(CC) $(OBJECTS) $(PROTOCOL_OBJECTS) -o $(TARGET) $(LDFLAGS)
+
+# Rule to generate Wayland protocol files
+$(C_PROTOCOL_SRC) $(H_PROTOCOL_HDR): $(PROTOCOLDIR)/wlr-layer-shell-unstable-v1.xml
+	wayland-scanner client-header /usr/share/wayland-protocols/stable/xdg-shell/xdg-shell.xml $(PROTOCOLDIR)/xdg-shell-client-protocol.h
+	wayland-scanner private-code /usr/share/wayland-protocols/stable/xdg-shell/xdg-shell.xml $(PROTOCOLDIR)/xdg-shell-protocol.c
+	wayland-scanner private-code $(PROTOCOLDIR)/wlr-layer-shell-unstable-v1.xml $(PROTOCOLDIR)/zwlr-layer-shell-v1-protocol.c
+	wayland-scanner client-header $(PROTOCOLDIR)/wlr-layer-shell-unstable-v1.xml $(PROTOCOLDIR)/zwlr-layer-shell-v1-client-protocol.h
+
+clean:
+	rm -rf $(OBJDIR) $(TARGET) $(C_PROTOCOL_SRC) $(H_PROTOCOL_HDR)
+
+# Development targets
+debug:
+	$(MAKE) BUILD_TYPE=debug
+
+release:
+	$(MAKE) BUILD_TYPE=release
+
+install: $(TARGET)
+	install -D $(TARGET) $(DESTDIR)/usr/local/bin/$(TARGET)
+	install -D bongocat.conf $(DESTDIR)/usr/local/share/bongocat/bongocat.conf.example
+
+uninstall:
+	rm -f $(DESTDIR)/usr/local/bin/$(TARGET)
+	rm -rf $(DESTDIR)/usr/local/share/bongocat
+
+# Static analysis
+analyze:
+	clang-tidy $(SOURCES) -- $(CFLAGS)
+
+# Memory check (requires valgrind)
+memcheck: debug
+	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./$(TARGET)
+
+# Performance profiling
+profile: release
+	perf record -g ./$(TARGET)
+	perf report
+
+.PHONY: debug release install uninstall analyze memcheck profile
