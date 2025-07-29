@@ -22,7 +22,7 @@ typedef struct {
     int enable_debug;
 } config_t;
 
-bongocat_error_t load_config(config_t *config);
+bongocat_error_t load_config(config_t *config, const char *config_file_path);
 void config_cleanup(void);
 int get_screen_width(void);
 

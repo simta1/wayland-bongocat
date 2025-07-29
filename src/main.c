@@ -94,7 +94,9 @@ int main(int argc, char *argv[]) {
     
     bongocat_log_info("Starting Bongo Cat Overlay v1.0");
     
-    // Parse command line arguments (basic implementation)
+    // Parse command line arguments
+    const char *config_file = NULL;
+    
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             printf("Bongo Cat Wayland Overlay\n");
@@ -109,6 +111,16 @@ int main(int argc, char *argv[]) {
             printf("Bongo Cat Overlay v1.0\n");
             printf("Built with fast optimizations\n");
             return 0;
+        } else if (strcmp(argv[i], "--config") == 0 || strcmp(argv[i], "-c") == 0) {
+            if (i + 1 < argc) {
+                config_file = argv[i + 1];
+                i++; // Skip the next argument since it's the config file path
+            } else {
+                bongocat_log_error("--config option requires a file path");
+                return 1;
+            }
+        } else {
+            bongocat_log_warning("Unknown argument: %s", argv[i]);
         }
     }
     
@@ -120,7 +132,7 @@ int main(int argc, char *argv[]) {
     }
     
     // Load configuration
-    result = load_config(&g_config);
+    result = load_config(&g_config, config_file);
     if (result != BONGOCAT_SUCCESS) {
         bongocat_log_error("Failed to load configuration: %s", bongocat_error_string(result));
         return 1;

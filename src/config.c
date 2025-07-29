@@ -85,12 +85,14 @@ static bongocat_error_t validate_config(config_t *config) {
     return BONGOCAT_SUCCESS;
 }
 
-static bongocat_error_t parse_config_file(config_t *config) {
+static bongocat_error_t parse_config_file(config_t *config, const char *config_file_path) {
     BONGOCAT_CHECK_NULL(config, BONGOCAT_ERROR_INVALID_PARAM);
     
-    FILE *file = fopen("bongocat.conf", "r");
+    const char *file_path = config_file_path ? config_file_path : "bongocat.conf";
+    
+    FILE *file = fopen(file_path, "r");
     if (!file) {
-        bongocat_log_info("Config file 'bongocat.conf' not found, using defaults");
+        bongocat_log_info("Config file '%s' not found, using defaults", file_path);
         return BONGOCAT_SUCCESS;
     }
     
@@ -175,7 +177,7 @@ static bongocat_error_t parse_config_file(config_t *config) {
     return result;
 }
 
-bongocat_error_t load_config(config_t *config) {
+bongocat_error_t load_config(config_t *config, const char *config_file_path) {
     BONGOCAT_CHECK_NULL(config, BONGOCAT_ERROR_INVALID_PARAM);
     
     // Initialize with defaults
@@ -202,7 +204,7 @@ bongocat_error_t load_config(config_t *config) {
     };
     
     // Parse config file and override defaults
-    bongocat_error_t result = parse_config_file(config);
+    bongocat_error_t result = parse_config_file(config, config_file_path);
     if (result != BONGOCAT_SUCCESS) {
         bongocat_log_error("Failed to parse configuration file: %s", bongocat_error_string(result));
         return result;
