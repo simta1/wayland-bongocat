@@ -107,7 +107,7 @@ int main(int argc, char *argv[]) {
             return 0;
         } else if (strcmp(argv[i], "--version") == 0 || strcmp(argv[i], "-v") == 0) {
             printf("Bongo Cat Overlay v1.0\n");
-            printf("Built with production-grade optimizations\n");
+            printf("Built with fast optimizations\n");
             return 0;
         }
     }

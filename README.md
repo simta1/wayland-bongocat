@@ -11,7 +11,7 @@ A Wayland overlay that displays an animated bongo cat reacting to keyboard input
 - **Automatic Screen Detection** - Dynamic screen width detection (Hyprland support)
 - **Configurable Positioning** - Precise pixel-level control
 
-### Production-Grade Architecture
+### Professional Architecture
 - **Modular Codebase** - Clean separation of concerns across 7 modules
 - **Comprehensive Error Handling** - Detailed logging with timestamps
 - **Memory Management** - Built-in leak detection and cleanup
@@ -76,7 +76,7 @@ make clean && make
 ### Build Process
 The Makefile automatically:
 1. **Generates Wayland protocol files** from XML specifications
-2. **Compiles source modules** with production-grade optimizations
+2. **Compiles source modules** with fast optimizations
 3. **Links the final executable** with required libraries
 4. **Applies security hardening** flags and optimizations
 
@@ -219,7 +219,7 @@ bongocat/
 ├── obj/                   # Compiled object files (created during build)
 ├── bongocat              # Final executable (created during build)
 ├── bongocat.conf         # User configuration file
-├── Makefile              # Production-grade build system
+├── Makefile              # Build system
 ├── build.sh              # Convenience build script
 └── README.md             # This documentation
 ```
@@ -365,7 +365,7 @@ If you encounter issues not covered here:
 - **Memory Safety** - Comprehensive leak detection and bounds checking
 - **Error Handling** - All functions return proper error codes
 - **Documentation** - Extensive inline comments and documentation
-- **Testing** - Production-grade build with optimization flags
+- **Testing** - Build with optimization flags
 
 ### Build System Features
 - **Dependency Tracking** - Automatic rebuilds on header changes
@@ -374,7 +374,7 @@ If you encounter issues not covered here:
 - **Static Analysis** - Comprehensive compiler warnings enabled
 
 ### Contributing
-This is a production-ready codebase following industry best practices. The modular architecture makes it easy to extend with new features or adapt for different use cases.
+This is a codebase following industry best practices. The modular architecture makes it easy to extend with new features or adapt for different use cases.
 
 ## 📄 License
 
@@ -384,4 +384,4 @@ This project is open source and available under a permissive license. Feel free 
 
 **Built with ❤️ for the Wayland community**
 
-*Bongo Cat Overlay v1.0 - Production Edition*
+*Bongo Cat Overlay v1.0*
