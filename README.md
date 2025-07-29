@@ -1,6 +1,11 @@
-# Bongo Cat Wayland Overlay
+# Bongo Cat Wayland Overlay <img src="assets/bongocat.gif" alt="Bongo Cat Demo" width="60" style="vertical-align: middle;">
 
 A Wayland overlay that displays an animated bongo cat reacting to keyboard input. Built with modern C11 standards and featuring a modular architecture, comprehensive error handling, and optimizations. Perfect for streamers, developers, or anyone who wants an adorable desktop companion!
+
+![Demo](assets/demo.gif)
+
+*Watch Bongo Cat react to your keystrokes in real-time!*
+
 
 ## ✨ Features
 
