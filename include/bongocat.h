@@ -15,6 +15,7 @@
 #include <sys/ioctl.h>
 #include <pthread.h>
 #include <linux/input.h>
+#include <sys/inotify.h>
 
 #define _POSIX_C_SOURCE 200809L
 #include <wayland-client.h>
@@ -28,5 +29,25 @@
 #define NUM_FRAMES 3
 #define DEFAULT_SCREEN_WIDTH 1920
 #define DEFAULT_BAR_HEIGHT 40
+
+// Config watcher constants
+#define INOTIFY_EVENT_SIZE (sizeof(struct inotify_event))
+#define INOTIFY_BUF_LEN (1024 * (INOTIFY_EVENT_SIZE + 16))
+
+// Config watcher structure
+typedef struct {
+    int inotify_fd;
+    int watch_fd;
+    pthread_t watcher_thread;
+    bool watching;
+    char *config_path;
+    void (*reload_callback)(const char *config_path);
+} ConfigWatcher;
+
+// Config watcher function declarations
+int config_watcher_init(ConfigWatcher *watcher, const char *config_path, void (*callback)(const char *));
+void config_watcher_start(ConfigWatcher *watcher);
+void config_watcher_stop(ConfigWatcher *watcher);
+void config_watcher_cleanup(ConfigWatcher *watcher);
 
 #endif // BONGOCAT_H

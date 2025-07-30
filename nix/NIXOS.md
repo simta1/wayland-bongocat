@@ -1,4 +1,6 @@
 # NixOS Installation Guide
+> [!WARNING]
+> I don't use nor tested nix os, this guide may contain wrong information, if you find something wrong open a PR with the changes.
 
 This guide covers various ways to install and use wayland-bongocat on NixOS.
 
@@ -51,29 +53,29 @@ Add to your `/etc/nixos/configuration.nix`:
   programs.wayland-bongocat = {
     enable = true
     autoStart = true;        # Start on login
-    
+
     # Position settings
     catXOffset = 120;        # Horizontal position
     catYOffset = 0;          # Vertical position
-    
+
     # Size settings
     catHeight = 40;          # Cat size in pixels
     overlayHeight = 60;      # Overlay bar height
-    
+
     # Animation settings
     idleFrame = 0;           # Default idle frame
     keypressDuration = 150;  # Animation duration (ms)
     fps = 60;                # Frame rate
-    
+
     # Visual settings
     overlayOpacity = 0;      # Transparent background
-    
+
     # Input devices (find yours with bongocat-find-devices)
     inputDevices = [
       "/dev/input/event4"    # Built-in keyboard
       "/dev/input/event20"   # External keyboard (example)
     ];
-    
+
     # Debug settings
     enableDebug = false;     # Set to true for troubleshooting
   };
@@ -267,7 +269,7 @@ If keyboard input isn't detected:
 Ensure your compositor supports the layer shell protocol:
 
 - ✅ **Hyprland** - Full support
-- ✅ **Sway** - Full support  
+- ✅ **Sway** - Full support
 - ✅ **Wayfire** - Compatible
 - ⚠️ **KDE Wayland** - Limited support
 - ❌ **GNOME Wayland** - Not supported
@@ -296,7 +298,7 @@ Run different instances with different configs:
 # Instance 1
 bongocat --config ~/.config/bongocat/work.conf &
 
-# Instance 2  
+# Instance 2
 bongocat --config ~/.config/bongocat/gaming.conf &
 ```
 

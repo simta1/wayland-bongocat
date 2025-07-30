@@ -21,6 +21,7 @@ extern bool configured;
 bongocat_error_t wayland_init(config_t *config);
 bongocat_error_t wayland_run(volatile sig_atomic_t *running);
 void wayland_cleanup(void);
+void wayland_update_config(config_t *config);
 void draw_bar(void);
 int create_shm(int size);
 
