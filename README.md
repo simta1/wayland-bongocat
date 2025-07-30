@@ -61,6 +61,25 @@ sudo pacman -S wayland wayland-protocols base-devel
 sudo dnf install wayland-devel wayland-protocols-devel gcc make
 ```
 
+#### NixOS
+
+```bash
+# Quick start with flakes
+nix run github:saatvik333/wayland-bongocat
+
+# Install to user profile
+nix profile install github:saatvik333/wayland-bongocat
+
+# Traditional Nix (without flakes)
+nix-env -f https://github.com/saatvik333/wayland-bongocat/archive/main.tar.gz -i
+
+# Development environment
+nix develop  # with flakes
+nix-shell nix/shell.nix  # traditional
+```
+
+📖 **For comprehensive NixOS installation and configuration, see [nix/NIXOS.md](nix/NIXOS.md)**
+
 ## 🔨 Building
 
 ### Quick Build
@@ -85,6 +104,23 @@ make clean
 make clean && make
 ```
 
+#### NixOS Build
+
+```bash
+# Using Nix flakes
+nix build
+
+# Traditional Nix
+nix-build nix/default.nix
+
+# Development shell
+nix develop  # with flakes
+nix-shell nix/shell.nix  # traditional
+
+# Run without installing
+nix run .    # with flakes
+```
+
 ### Build Process
 
 The Makefile automatically:
@@ -107,16 +143,16 @@ The Makefile automatically:
 
 ```bash
 # Run with default configuration
-./bongocat
+bongocat
 
 # Show help information
-./bongocat --help
+bongocat --help
 
 # Display version information
-./bongocat --version
+bongocat --version
 
 # Use custom configuration file
-./bongocat --config my_config.conf
+bongocat --config my_config.conf
 ```
 
 ### Command-Line Options
@@ -176,12 +212,15 @@ keyboard_device=/dev/input/event4   # Path to your primary keyboard device
 ### New Features
 
 #### Multiple Input Device Support
+
 You can now monitor multiple input devices simultaneously. This is useful when you have:
+
 - Built-in laptop keyboard + external keyboard
 - Multiple keyboards connected
 - Different input devices you want to monitor
 
 Simply add multiple `keyboard_device` lines in your configuration:
+
 ```ini
 keyboard_device=/dev/input/event4   # Built-in keyboard
 keyboard_device=/dev/input/event20  # External bluetooth keyboard
@@ -189,7 +228,9 @@ keyboard_device=/dev/input/event5   # Another input device
 ```
 
 #### Click-Through Overlay
+
 The overlay is now click-through, meaning:
+
 - You can interact with windows and applications underneath the overlay
 - The bongo cat animation won't interfere with your workflow
 - Mouse clicks and keyboard input pass through to underlying applications
@@ -209,7 +250,7 @@ The overlay is now click-through, meaning:
 | `fps`                     | Integer | 1 to 120      | 60                  | Animation frame rate                           |
 | `overlay_opacity`         | Integer | 0 to 255      | 150                 | Background opacity (0=transparent, 255=opaque) |
 | `enable_debug`            | Boolean | 0 or 1        | 1                   | Enable debug logging                           |
-| `keyboard_device`         | String  | Valid path    | `/dev/input/event4` | Input device path (can specify multiple)      |
+| `keyboard_device`         | String  | Valid path    | `/dev/input/event4` | Input device path (can specify multiple)       |
 
 ### Animation Frame Reference
 
@@ -319,7 +360,7 @@ The project includes high-quality animation frames:
 2. **Run with elevated permissions** (temporary):
 
    ```bash
-   sudo ./bongocat
+   sudo bongocat
    ```
 
 3. **Use udev rules** (system-wide):
@@ -353,12 +394,14 @@ sudo evtest
 **Problem**: Only one keyboard works, external keyboard not detected
 
 **Solution**: Add multiple `keyboard_device` lines in your configuration:
+
 ```ini
 keyboard_device=/dev/input/event4   # Built-in keyboard
 keyboard_device=/dev/input/event20  # External keyboard
 ```
 
 **Finding device paths**:
+
 ```bash
 # Use the included helper script
 ./scripts/find_input_devices.sh
@@ -376,6 +419,7 @@ sudo evtest
 **Problem**: Can't click through the overlay to underlying windows
 
 **Solution**: This should work automatically with the new implementation. If you experience issues:
+
 - Ensure you're using a compatible Wayland compositor (Hyprland, Sway, Wayfire)
 - Check that the overlay layer is set to OVERLAY (this is automatic)
 - Verify your compositor supports the layer shell protocol
@@ -399,7 +443,7 @@ sudo evtest
 1. **Enable debug logging**:
 
    ```bash
-   ./bongocat --config bongocat.conf  # Ensure enable_debug=1
+   bongocat --config bongocat.conf  # Ensure enable_debug=1
    ```
 
 2. **Check Wayland compositor**:
@@ -456,6 +500,57 @@ If you encounter issues not covered here:
 - **KDE Wayland** ⚠️ Limited layer shell support
 - **GNOME Wayland** ❌ No layer shell support
 
+### NixOS Integration
+
+The project includes comprehensive NixOS support:
+
+- **Nix Flakes**: Modern, reproducible builds with `flake.nix`
+- **Traditional Nix**: Compatible with `default.nix` and `shell.nix`
+- **Development Environment**: Pre-configured with all dependencies
+- **Helper Tools**: Input device finder included as `bongocat-find-devices`
+
+#### NixOS Configuration
+
+**Option 1: Simple package installation**
+
+```nix
+# In your configuration.nix
+environment.systemPackages = with pkgs; [
+  (callPackage /path/to/wayland-bongocat/nix/default.nix {})
+];
+```
+
+**Option 2: Using the NixOS module (recommended)**
+
+```nix
+# In your configuration.nix
+imports = [ /path/to/wayland-bongocat/nix/nixos-module.nix ];
+
+programs.wayland-bongocat = {
+  enable = true;
+  autoStart = true;        # Start automatically on login
+
+  # Customize settings
+  catHeight = 50;
+  overlayOpacity = 0;      # Fully transparent background
+  inputDevices = [
+    "/dev/input/event4"    # Built-in keyboard
+    "/dev/input/event20"   # External keyboard
+  ];
+};
+```
+
+**Option 3: With flakes**
+
+```nix
+# In your flake.nix
+inputs.bongocat.url = "github:saatvik333/wayland-bongocat";
+
+# Then in your NixOS configuration
+imports = [ inputs.bongocat.nixosModules.default ];
+programs.wayland-bongocat.enable = true;
+```
+
 ## 🚀 Development
 
 ### Code Quality Standards
@@ -485,4 +580,4 @@ This project is open source and available under a permissive license. Feel free 
 
 **Built with ❤️ for the Wayland community**
 
-_Bongo Cat Overlay v1.1.0_
+_Bongo Cat Overlay v1.2.0_

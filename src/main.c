@@ -92,7 +92,7 @@ int main(int argc, char *argv[]) {
     // Initialize error system early
     bongocat_error_init(1); // Enable debug initially
     
-    bongocat_log_info("Starting Bongo Cat Overlay v1.1");
+    bongocat_log_info("Starting Bongo Cat Overlay v" BONGOCAT_VERSION);
     
     // Parse command line arguments
     const char *config_file = NULL;
@@ -108,7 +108,7 @@ int main(int argc, char *argv[]) {
             printf("\nConfiguration is loaded from bongocat.conf in the current directory.\n");
             return 0;
         } else if (strcmp(argv[i], "--version") == 0 || strcmp(argv[i], "-v") == 0) {
-            printf("Bongo Cat Overlay v1.1\n");
+            printf("Bongo Cat Overlay v" BONGOCAT_VERSION "\n");
             printf("Built with fast optimizations\n");
             return 0;
         } else if (strcmp(argv[i], "--config") == 0 || strcmp(argv[i], "-c") == 0) {

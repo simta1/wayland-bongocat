@@ -21,6 +21,9 @@
 
 #include "../lib/stb_image.h"
 
+// Version
+#define BONGOCAT_VERSION "1.2"
+
 // Common constants
 #define NUM_FRAMES 3
 #define DEFAULT_SCREEN_WIDTH 1920

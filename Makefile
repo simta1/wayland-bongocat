@@ -32,7 +32,8 @@ endif
 # Directories
 SRCDIR = src
 INCDIR = include
-OBJDIR = obj
+BUILDDIR = build
+OBJDIR = $(BUILDDIR)/obj
 PROTOCOLDIR = protocols
 
 # Source files (excluding embedded assets which is generated)
@@ -50,7 +51,7 @@ H_PROTOCOL_HDR = $(PROTOCOLDIR)/zwlr-layer-shell-v1-client-protocol.h $(PROTOCOL
 PROTOCOL_OBJECTS = $(C_PROTOCOL_SRC:$(PROTOCOLDIR)/%.c=$(OBJDIR)/%.o)
 
 # Target executable
-TARGET = bongocat
+TARGET = $(BUILDDIR)/bongocat
 
 .PHONY: all clean protocols embed-assets
 
@@ -65,9 +66,10 @@ embed-assets: $(EMBEDDED_ASSETS_H) $(EMBEDDED_ASSETS_C)
 $(EMBEDDED_ASSETS_H) $(EMBEDDED_ASSETS_C): $(EMBED_SCRIPT) assets/*.png
 	./$(EMBED_SCRIPT)
 
-# Create object directory
+# Create build directories
 $(OBJDIR):
 	mkdir -p $(OBJDIR)
+	mkdir -p $(BUILDDIR)
 
 # Compile source files (depends on protocol headers and embedded assets)
 $(OBJDIR)/%.o: $(SRCDIR)/%.c $(H_PROTOCOL_HDR) $(EMBEDDED_ASSETS_H) | $(OBJDIR)
@@ -88,7 +90,7 @@ $(C_PROTOCOL_SRC) $(H_PROTOCOL_HDR): $(PROTOCOLDIR)/wlr-layer-shell-unstable-v1.
 	wayland-scanner client-header $(PROTOCOLDIR)/wlr-layer-shell-unstable-v1.xml $(PROTOCOLDIR)/zwlr-layer-shell-v1-client-protocol.h
 
 clean:
-	rm -rf $(OBJDIR) $(TARGET) $(C_PROTOCOL_SRC) $(H_PROTOCOL_HDR) $(EMBEDDED_ASSETS_H) $(EMBEDDED_ASSETS_C)
+	rm -rf $(BUILDDIR) $(C_PROTOCOL_SRC) $(H_PROTOCOL_HDR) $(EMBEDDED_ASSETS_H) $(EMBEDDED_ASSETS_C)
 
 # Development targets
 debug:
@@ -98,11 +100,13 @@ release:
 	$(MAKE) BUILD_TYPE=release
 
 install: $(TARGET)
-	install -D $(TARGET) $(DESTDIR)/usr/local/bin/$(TARGET)
+	install -D $(TARGET) $(DESTDIR)/usr/local/bin/bongocat
 	install -D bongocat.conf $(DESTDIR)/usr/local/share/bongocat/bongocat.conf.example
+	install -D scripts/find_input_devices.sh $(DESTDIR)/usr/local/bin/bongocat-find-devices
 
 uninstall:
-	rm -f $(DESTDIR)/usr/local/bin/$(TARGET)
+	rm -f $(DESTDIR)/usr/local/bin/bongocat
+	rm -f $(DESTDIR)/usr/local/bin/bongocat-find-devices
 	rm -rf $(DESTDIR)/usr/local/share/bongocat
 
 # Static analysis
