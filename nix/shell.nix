@@ -1,5 +1,4 @@
-{ pkgs ? import <nixpkgs> {} }:
-
+{pkgs ? import <nixpkgs> {}}:
 pkgs.mkShell {
   buildInputs = with pkgs; [
     # Build dependencies
@@ -9,16 +8,16 @@ pkgs.mkShell {
     wayland-scanner
     wayland-protocols
     wayland
-    
+
     # Development tools
     gdb
     valgrind
     clang-tools
-    
+
     # Optional tools for input device debugging
     evtest
     udev
-    
+
     # Documentation tools
     man-pages
     man-pages-posix

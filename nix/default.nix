@@ -93,4 +93,3 @@ stdenv.mkDerivation rec {
     mainProgram = "bongocat";
   };
 }
-

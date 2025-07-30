@@ -8,37 +8,40 @@
 with lib; let
   cfg = config.programs.wayland-bongocat;
   wayland-bongocat = pkgs.callPackage ./default.nix {};
-  configFile = pkgs.writeText "bongocat.conf" ''
-    # Generated NixOS configuration for wayland-bongocat
+  configFile = pkgs.writeTextFile {
+    name = "bongocat.conf";
+    text = ''
+      # Auto-generated config for `wayland-bongocat`
 
-    # Position settings (in pixels)
-    cat_x_offset=${toString cfg.catXOffset}
-    cat_y_offset=${toString cfg.catYOffset}
+      # Position
+      cat_x_offset=${toString cfg.catXOffset}
+      cat_y_offset=${toString cfg.catYOffset}
 
-    # Size settings
-    cat_height=${toString cfg.catHeight}
-    overlay_height=${toString cfg.overlayHeight}
+      # Size
+      cat_height=${toString cfg.catHeight}
+      overlay_height=${toString cfg.overlayHeight}
 
-    # Animation settings
-    idle_frame=${toString cfg.idleFrame}
-    keypress_duration=${toString cfg.keypressDuration}
-    test_animation_duration=${toString cfg.testAnimationDuration}
-    test_animation_interval=${toString cfg.testAnimationInterval}
+      # Animations
+      idle_frame=${toString cfg.idleFrame}
+      keypress_duration=${toString cfg.keypressDuration}
+      test_animation_duration=${toString cfg.testAnimationDuration}
+      test_animation_interval=${toString cfg.testAnimationInterval}
 
-    # Performance settings
-    fps=${toString cfg.fps}
-    overlay_opacity=${toString cfg.overlayOpacity}
+      # Performance
+      fps=${toString cfg.fps}
+      overlay_opacity=${toString cfg.overlayOpacity}
 
-    # Debug settings
-    enable_debug=${
-      if cfg.enableDebug
-      then "1"
-      else "0"
-    }
+      # Debug mode
+      enable_debug=${
+        if cfg.enableDebug
+        then "1"
+        else "0"
+      }
 
-    # Input devices
-    ${concatMapStringsSep "\n" (device: "keyboard_device=${device}") cfg.inputDevices}
-  '';
+      # Input devices
+      ${concatMapStringsSep "\n" (device: "keyboard_device=${device}") cfg.inputDevices}
+    '';
+  };
 in {
   meta.maintainers = with lib.maintainers; [];
   options.programs.wayland-bongocat = {
@@ -55,58 +58,60 @@ in {
       description = "The wayland-bongocat package to use.";
     };
 
-    # Position settings
+    # Debug mode
+    enableDebug = mkOption {
+      type = types.bool;
+      default = false;
+      description = "Enable debug logging";
+    };
+
+    # Position
     catXOffset = mkOption {
       type = types.int;
       default = 120;
       description = "Horizontal offset from center position (pixels)";
     };
-
     catYOffset = mkOption {
       type = types.int;
       default = 0;
       description = "Vertical offset from center position (pixels)";
     };
 
-    # Size settings
+    # Size
     catHeight = mkOption {
       type = types.int;
       default = 40;
       description = "Height of the bongo cat in pixels";
     };
-
     overlayHeight = mkOption {
       type = types.int;
       default = 60;
       description = "Height of the entire overlay bar";
     };
 
-    # Animation settings
+    # Animations
     idleFrame = mkOption {
       type = types.int;
       default = 0;
       description = "Frame to use when idle (0, 1, or 2)";
     };
-
     keypressDuration = mkOption {
       type = types.int;
       default = 150;
       description = "Animation duration after keypress (ms)";
     };
-
     testAnimationDuration = mkOption {
       type = types.int;
       default = 200;
       description = "Test animation duration (ms)";
     };
-
     testAnimationInterval = mkOption {
       type = types.int;
       default = 0;
       description = "How often to trigger test animation (seconds, 0 = disabled)";
     };
 
-    # Performance settings
+    # Performance
     fps = mkOption {
       type = types.int;
       default = 60;
@@ -119,18 +124,11 @@ in {
       description = "Overlay background opacity (0-255, 0 = transparent)";
     };
 
-    # Debug settings
-    enableDebug = mkOption {
-      type = types.bool;
-      default = false;
-      description = "Enable debug logging";
-    };
-
     # Input devices
     inputDevices = mkOption {
       type = types.listOf types.str;
       default = ["/dev/input/event4"];
-      description = "List of input device paths to monitor";
+      description = "List of input devices to monitor, run `bongocat-find-devices` to see all devices to add to this list";
       example = ["/dev/input/event4" "/dev/input/event20"];
     };
   };
