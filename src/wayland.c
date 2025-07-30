@@ -149,7 +149,7 @@ bongocat_error_t wayland_init(config_t *config) {
     }
     
     layer_surface = zwlr_layer_shell_v1_get_layer_surface(layer_shell, surface, NULL,
-                                                          ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND, "bongocat-overlay");
+                                                          ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY, "bongocat-overlay");
     if (!layer_surface) {
         bongocat_log_error("Failed to create layer surface");
         wl_surface_destroy(surface);
@@ -166,7 +166,24 @@ bongocat_error_t wayland_init(config_t *config) {
     zwlr_layer_surface_v1_set_size(layer_surface, 0, config->bar_height);
     zwlr_layer_surface_v1_set_exclusive_zone(layer_surface, -1);
     zwlr_layer_surface_v1_set_margin(layer_surface, 0, 0, 0, 0);
+    
+    // Make the overlay click-through by setting keyboard interactivity to none
+    zwlr_layer_surface_v1_set_keyboard_interactivity(layer_surface, 
+                                                     ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE);
+    
     zwlr_layer_surface_v1_add_listener(layer_surface, &layer_listener, NULL);
+    
+    // Create an empty input region to make the surface click-through
+    struct wl_region *input_region = wl_compositor_create_region(compositor);
+    if (input_region) {
+        // Don't add any rectangles to the region, keeping it empty
+        wl_surface_set_input_region(surface, input_region);
+        wl_region_destroy(input_region);
+        bongocat_log_debug("Set empty input region for click-through functionality");
+    } else {
+        bongocat_log_warning("Failed to create input region for click-through");
+    }
+    
     wl_surface_commit(surface);
 
     // Create shared memory buffer

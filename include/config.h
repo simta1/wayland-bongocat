@@ -8,7 +8,8 @@ typedef struct {
     int screen_width;
     int bar_height;
     const char *asset_paths[NUM_FRAMES];
-    const char *keyboard_device;
+    char **keyboard_devices;
+    int num_keyboard_devices;
     int cat_x_offset;
     int cat_y_offset;
     int cat_height;

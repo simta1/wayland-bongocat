@@ -128,7 +128,8 @@ The Makefile automatically:
 ### Expected Behavior
 
 - The overlay appears as a transparent layer on your desktop
-- Bongo cat animates in response to keyboard input
+- Bongo cat animates in response to keyboard input from any configured device
+- The overlay is click-through, allowing interaction with underlying windows
 - Runs continuously until terminated (Ctrl+C)
 - Logs activity to console (configurable verbosity)
 
@@ -166,9 +167,32 @@ overlay_opacity=150     # Background opacity (0-255, 0 = transparent, 255 = opaq
 # Debug settings
 enable_debug=1          # Show debug messages (0 = off, 1 = on)
 
-# Input device
-keyboard_device=/dev/input/event4  # Path to your keyboard device
+# Input devices (supports multiple devices)
+keyboard_device=/dev/input/event4   # Path to your primary keyboard device
+# keyboard_device=/dev/input/event20 # External bluetooth keyboard
+# keyboard_device=/dev/input/event5  # Additional input device
 ```
+
+### New Features
+
+#### Multiple Input Device Support
+You can now monitor multiple input devices simultaneously. This is useful when you have:
+- Built-in laptop keyboard + external keyboard
+- Multiple keyboards connected
+- Different input devices you want to monitor
+
+Simply add multiple `keyboard_device` lines in your configuration:
+```ini
+keyboard_device=/dev/input/event4   # Built-in keyboard
+keyboard_device=/dev/input/event20  # External bluetooth keyboard
+keyboard_device=/dev/input/event5   # Another input device
+```
+
+#### Click-Through Overlay
+The overlay is now click-through, meaning:
+- You can interact with windows and applications underneath the overlay
+- The bongo cat animation won't interfere with your workflow
+- Mouse clicks and keyboard input pass through to underlying applications
 
 ### Configuration Options Reference
 
@@ -185,7 +209,7 @@ keyboard_device=/dev/input/event4  # Path to your keyboard device
 | `fps`                     | Integer | 1 to 120      | 60                  | Animation frame rate                           |
 | `overlay_opacity`         | Integer | 0 to 255      | 150                 | Background opacity (0=transparent, 255=opaque) |
 | `enable_debug`            | Boolean | 0 or 1        | 1                   | Enable debug logging                           |
-| `keyboard_device`         | String  | Valid path    | `/dev/input/event4` | Input device path                              |
+| `keyboard_device`         | String  | Valid path    | `/dev/input/event4` | Input device path (can specify multiple)      |
 
 ### Animation Frame Reference
 
@@ -322,7 +346,39 @@ cat /proc/bus/input/devices
 sudo evtest
 ```
 
-**Solution**: Update `keyboard_device` in `bongocat.conf` with the correct device path.
+**Solution**: Update `keyboard_device` entries in `bongocat.conf` with the correct device paths.
+
+#### Multiple Input Devices
+
+**Problem**: Only one keyboard works, external keyboard not detected
+
+**Solution**: Add multiple `keyboard_device` lines in your configuration:
+```ini
+keyboard_device=/dev/input/event4   # Built-in keyboard
+keyboard_device=/dev/input/event20  # External keyboard
+```
+
+**Finding device paths**:
+```bash
+# Use the included helper script
+./scripts/find_input_devices.sh
+
+# Or manually:
+# List input devices with names
+cat /proc/bus/input/devices | grep -E "(Name|Handlers)"
+
+# Test which device generates events
+sudo evtest
+```
+
+#### Click-Through Issues
+
+**Problem**: Can't click through the overlay to underlying windows
+
+**Solution**: This should work automatically with the new implementation. If you experience issues:
+- Ensure you're using a compatible Wayland compositor (Hyprland, Sway, Wayfire)
+- Check that the overlay layer is set to OVERLAY (this is automatic)
+- Verify your compositor supports the layer shell protocol
 
 #### Build Errors
 

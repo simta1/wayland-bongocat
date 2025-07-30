@@ -12,28 +12,54 @@
 int *any_key_pressed;
 static pid_t input_child_pid = -1;
 
-static void capture_input(const char *device_path, int enable_debug) {
-    bongocat_log_debug("Starting input capture on: %s", device_path);
+static void capture_input_multiple(char **device_paths, int num_devices, int enable_debug) {
+    bongocat_log_debug("Starting input capture on %d devices", num_devices);
     
-    // Validate device path exists and is readable
-    struct stat st;
-    if (stat(device_path, &st) != 0) {
-        bongocat_log_error("Input device does not exist: %s", device_path);
+    int *fds = BONGOCAT_MALLOC(num_devices * sizeof(int));
+    if (!fds) {
+        bongocat_log_error("Failed to allocate memory for file descriptors");
         exit(1);
     }
     
-    if (!S_ISCHR(st.st_mode)) {
-        bongocat_log_error("Input device is not a character device: %s", device_path);
+    int max_fd = -1;
+    int valid_devices = 0;
+    
+    // Open all devices
+    for (int i = 0; i < num_devices; i++) {
+        fds[i] = -1;
+        
+        // Validate device path exists and is readable
+        struct stat st;
+        if (stat(device_paths[i], &st) != 0) {
+            bongocat_log_warning("Input device does not exist: %s", device_paths[i]);
+            continue;
+        }
+        
+        if (!S_ISCHR(st.st_mode)) {
+            bongocat_log_warning("Input device is not a character device: %s", device_paths[i]);
+            continue;
+        }
+        
+        fds[i] = open(device_paths[i], O_RDONLY | O_NONBLOCK);
+        if (fds[i] < 0) {
+            bongocat_log_warning("Failed to open %s: %s", device_paths[i], strerror(errno));
+            continue;
+        }
+        
+        bongocat_log_info("Input monitoring started on %s (fd=%d)", device_paths[i], fds[i]);
+        if (fds[i] > max_fd) {
+            max_fd = fds[i];
+        }
+        valid_devices++;
+    }
+    
+    if (valid_devices == 0) {
+        bongocat_log_error("No valid input devices found");
+        BONGOCAT_SAFE_FREE(fds);
         exit(1);
     }
     
-    int fd = open(device_path, O_RDONLY | O_NONBLOCK);
-    if (fd < 0) {
-        bongocat_log_error("Failed to open %s: %s", device_path, strerror(errno));
-        exit(1);
-    }
-    
-    bongocat_log_info("Input monitoring started on %s", device_path);
+    bongocat_log_info("Successfully opened %d/%d input devices", valid_devices, num_devices);
 
     struct input_event ev[64];
     int rd;
@@ -42,50 +68,86 @@ static void capture_input(const char *device_path, int enable_debug) {
     
     while (1) {
         FD_ZERO(&readfds);
-        FD_SET(fd, &readfds);
+        
+        // Add all valid file descriptors to the set
+        for (int i = 0; i < num_devices; i++) {
+            if (fds[i] >= 0) {
+                FD_SET(fds[i], &readfds);
+            }
+        }
+        
         timeout.tv_sec = 1;
         timeout.tv_usec = 0;
         
-        int select_result = select(fd + 1, &readfds, NULL, NULL, &timeout);
+        int select_result = select(max_fd + 1, &readfds, NULL, NULL, &timeout);
         if (select_result < 0) {
             if (errno == EINTR) continue; // Interrupted by signal
-            bongocat_log_error("Select error on %s: %s", device_path, strerror(errno));
+            bongocat_log_error("Select error: %s", strerror(errno));
             break;
         }
         
         if (select_result == 0) continue; // Timeout
         
-        rd = read(fd, ev, sizeof(ev));
-        if (rd < 0) {
-            if (errno == EAGAIN) continue;
-            bongocat_log_error("Read error on %s: %s", device_path, strerror(errno));
-            break;
+        // Check which devices have data
+        for (int i = 0; i < num_devices; i++) {
+            if (fds[i] >= 0 && FD_ISSET(fds[i], &readfds)) {
+                rd = read(fds[i], ev, sizeof(ev));
+                if (rd < 0) {
+                    if (errno == EAGAIN) continue;
+                    bongocat_log_warning("Read error on %s: %s", device_paths[i], strerror(errno));
+                    close(fds[i]);
+                    fds[i] = -1;
+                    valid_devices--;
+                    continue;
+                }
+                
+                if (rd == 0) {
+                    bongocat_log_warning("EOF on input device %s", device_paths[i]);
+                    close(fds[i]);
+                    fds[i] = -1;
+                    valid_devices--;
+                    continue;
+                }
+
+                for (int j = 0; j < (int)(rd / sizeof(struct input_event)); j++) {
+                    if (ev[j].type == EV_KEY && ev[j].value == 1) {
+                        if (enable_debug) {
+                            bongocat_log_debug("Key event: device=%s, code=%d, time=%ld.%06ld", 
+                                             device_paths[i], ev[j].code, ev[j].time.tv_sec, ev[j].time.tv_usec);
+                        }
+                        animation_trigger();
+                    }
+                }
+            }
         }
         
-        if (rd == 0) {
-            bongocat_log_warning("EOF on input device %s", device_path);
+        // Exit if no valid devices remain
+        if (valid_devices == 0) {
+            bongocat_log_error("All input devices became unavailable");
             break;
-        }
-
-        for (int i = 0; i < (int)(rd / sizeof(struct input_event)); i++) {
-            if (ev[i].type == EV_KEY && ev[i].value == 1) {
-                if (enable_debug) {
-                    bongocat_log_debug("Key event: device=%s, code=%d, time=%ld.%06ld", 
-                                     device_path, ev[i].code, ev[i].time.tv_sec, ev[i].time.tv_usec);
-                }
-                animation_trigger();
-            }
         }
     }
     
-    close(fd);
+    // Close all file descriptors
+    for (int i = 0; i < num_devices; i++) {
+        if (fds[i] >= 0) {
+            close(fds[i]);
+        }
+    }
+    
+    BONGOCAT_SAFE_FREE(fds);
     bongocat_log_info("Input monitoring stopped");
 }
 
-bongocat_error_t input_start_monitoring(const char *device_path, int enable_debug) {
-    BONGOCAT_CHECK_NULL(device_path, BONGOCAT_ERROR_INVALID_PARAM);
+bongocat_error_t input_start_monitoring(char **device_paths, int num_devices, int enable_debug) {
+    BONGOCAT_CHECK_NULL(device_paths, BONGOCAT_ERROR_INVALID_PARAM);
     
-    bongocat_log_info("Initializing input monitoring system");
+    if (num_devices <= 0) {
+        bongocat_log_error("No input devices specified");
+        return BONGOCAT_ERROR_INVALID_PARAM;
+    }
+    
+    bongocat_log_info("Initializing input monitoring system for %d devices", num_devices);
     
     // Initialize shared memory for key press flag
     any_key_pressed = (int *)mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE, 
@@ -106,9 +168,9 @@ bongocat_error_t input_start_monitoring(const char *device_path, int enable_debu
     }
     
     if (input_child_pid == 0) {
-        // Child process - handle keyboard input
+        // Child process - handle keyboard input from multiple devices
         bongocat_log_debug("Input monitoring child process started (PID: %d)", getpid());
-        capture_input(device_path, enable_debug);
+        capture_input_multiple(device_paths, num_devices, enable_debug);
         exit(0);
     }
     
