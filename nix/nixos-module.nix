@@ -152,8 +152,12 @@ in {
       wantedBy = ["graphical-session.target"];
       partOf = ["graphical-session.target"];
       after = ["graphical-session.target"];
+      environment = {
+        WAYLAND_DISPLAY = "wayland-0";
+        XDG_RUNTIME_DIR = "/run/user/%i";
+      };
       serviceConfig = {
-        Type = "simple";
+        Type = "exec";
         ExecStart = "${cfg.package}/bin/bongocat --config ${configFile}";
         Restart = "on-failure";
         RestartSec = "5s";
@@ -163,12 +167,6 @@ in {
         PrivateTmp = true;
         ProtectSystem = "strict";
         ProtectHome = "read-only";
-
-        # Environment variables
-        Environment = [
-          "WAYLAND_DISPLAY=wayland-0"
-          "XDG_RUNTIME_DIR=/run/user/%i"
-        ];
       };
     };
   };
