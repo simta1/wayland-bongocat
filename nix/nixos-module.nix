@@ -152,10 +152,6 @@ in {
       wantedBy = ["graphical-session.target"];
       partOf = ["graphical-session.target"];
       after = ["graphical-session.target"];
-      environment = {
-        WAYLAND_DISPLAY = "wayland-0";
-        XDG_RUNTIME_DIR = "/run/user/%i";
-      };
       serviceConfig = {
         Type = "exec";
         ExecStart = "${cfg.package}/bin/bongocat --config ${configFile}";
