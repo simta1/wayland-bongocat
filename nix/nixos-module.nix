@@ -185,10 +185,9 @@ in {
     };
 
     # Ensure input group exists and user is added to it
-    users.groups.input = mkIf (cfg.user != null) {
-      users.users.${cfg.user} = mkIf (cfg.user != null) {
-        extraGroups = ["input"];
-      };
+    users.groups.input = mkIf (cfg.user != null) {};
+    users.users.${cfg.user} = mkIf (cfg.user != null) {
+      extraGroups = ["input"];
     };
   };
 }
