@@ -43,6 +43,11 @@ in {
   meta.maintainers = with lib.maintainers; [];
   options.programs.wayland-bongocat = {
     enable = mkEnableOption "wayland-bongocat overlay";
+    autostart = mkOption {
+      type = types.bool;
+      default = false;
+      description = "Enable and automatically start `bongocat-wayland` as a service on login";
+    };
 
     package = mkOption {
       type = types.package;
@@ -80,19 +85,19 @@ in {
     idleFrame = mkOption {
       type = types.int;
       default = 0;
-      description = "Which frame to use when idle (0, 1, or 2)";
+      description = "Frame to use when idle (0, 1, or 2)";
     };
 
     keypressDuration = mkOption {
       type = types.int;
       default = 150;
-      description = "How long to show animation after keypress (ms)";
+      description = "Animation duration after keypress (ms)";
     };
 
     testAnimationDuration = mkOption {
       type = types.int;
       default = 200;
-      description = "How long to show test animation (ms)";
+      description = "Test animation duration (ms)";
     };
 
     testAnimationInterval = mkOption {
@@ -105,7 +110,7 @@ in {
     fps = mkOption {
       type = types.int;
       default = 60;
-      description = "Animation frame rate (frames per second)";
+      description = "Animation framerate (FPS)";
     };
 
     overlayOpacity = mkOption {
@@ -128,19 +133,6 @@ in {
       description = "List of input device paths to monitor";
       example = ["/dev/input/event4" "/dev/input/event20"];
     };
-
-    # User service options
-    user = mkOption {
-      type = types.nullOr types.str;
-      default = "saatvik333";
-      description = "User to run the service as (null = don't create service)";
-    };
-
-    autoStart = mkOption {
-      type = types.bool;
-      default = false;
-      description = "Automatically start the service on login";
-    };
   };
 
   config = mkIf cfg.enable {
@@ -148,7 +140,7 @@ in {
     environment.systemPackages = [
       cfg.package
 
-      # Create helper script for finding input devices
+      # Helper script for finding input devices
       (pkgs.writeScriptBin "bongocat-find-devices" ''
         #!${pkgs.bash}/bin/bash
         exec ${cfg.package}/bin/bongocat-find-devices "$@"
@@ -156,9 +148,9 @@ in {
     ];
 
     # Create systemd user service if user is specified
-    systemd.user.services.wayland-bongocat = mkIf (cfg.user != null) {
+    systemd.user.services.wayland-bongocat = mkIf cfg.autostart {
       description = "Wayland Bongo Cat Overlay";
-      wantedBy = mkIf cfg.autoStart ["graphical-session.target"];
+      wantedBy = ["graphical-session.target"];
       partOf = ["graphical-session.target"];
       after = ["graphical-session.target"];
 
@@ -182,12 +174,6 @@ in {
         WAYLAND_DISPLAY = "wayland-0";
         XDG_RUNTIME_DIR = "/run/user/%i";
       };
-    };
-
-    # Ensure input group exists and user is added to it
-    users.groups.input = mkIf (cfg.user != null) {};
-    users.users.${cfg.user} = mkIf (cfg.user != null) {
-      extraGroups = ["input"];
     };
   };
 }
