@@ -161,12 +161,6 @@ in {
         ExecStart = "${cfg.package}/bin/bongocat --config ${configFile}";
         Restart = "on-failure";
         RestartSec = "5s";
-
-        # Security settings
-        NoNewPrivileges = true;
-        PrivateTmp = true;
-        ProtectSystem = "strict";
-        ProtectHome = "read-only";
       };
     };
   };
