@@ -7,9 +7,7 @@
 }:
 with lib; let
   cfg = config.programs.wayland-bongocat;
-
   wayland-bongocat = pkgs.callPackage ./default.nix {};
-
   configFile = pkgs.writeText "bongocat.conf" ''
     # Generated NixOS configuration for wayland-bongocat
 
@@ -42,11 +40,7 @@ with lib; let
     ${concatMapStringsSep "\n" (device: "keyboard_device=${device}") cfg.inputDevices}
   '';
 in {
-  meta = {
-    maintainers = with lib.maintainers; [];
-    doc = ../README.md;
-  };
-
+  meta.maintainers = with lib.maintainers; [];
   options.programs.wayland-bongocat = {
     enable = mkEnableOption "wayland-bongocat overlay";
 
@@ -198,4 +192,3 @@ in {
     };
   };
 }
-
