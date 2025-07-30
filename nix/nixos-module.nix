@@ -147,11 +147,11 @@ in {
 
     # Create systemd user service if user is specified
     systemd.user.services.wayland-bongocat = mkIf cfg.autostart {
+      enable = true;
       description = "Wayland Bongo Cat Overlay";
       wantedBy = ["graphical-session.target"];
       partOf = ["graphical-session.target"];
       after = ["graphical-session.target"];
-
       serviceConfig = {
         Type = "simple";
         ExecStart = "${cfg.package}/bin/bongocat --config ${configFile}";
@@ -163,9 +163,6 @@ in {
         PrivateTmp = true;
         ProtectSystem = "strict";
         ProtectHome = "read-only";
-
-        # Allow access to input devices
-        SupplementaryGroups = ["input"];
       };
 
       environment = {
