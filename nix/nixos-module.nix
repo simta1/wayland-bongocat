@@ -163,11 +163,12 @@ in {
         PrivateTmp = true;
         ProtectSystem = "strict";
         ProtectHome = "read-only";
-      };
 
-      environment = {
-        WAYLAND_DISPLAY = "wayland-0";
-        XDG_RUNTIME_DIR = "/run/user/%i";
+        # Environment variables
+        Environment = {
+          WAYLAND_DISPLAY = "wayland-0";
+          XDG_RUNTIME_DIR = "/run/user/%i";
+        };
       };
     };
   };
