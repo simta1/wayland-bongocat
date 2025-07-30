@@ -165,10 +165,10 @@ in {
         ProtectHome = "read-only";
 
         # Environment variables
-        Environment = {
-          WAYLAND_DISPLAY = "wayland-0";
-          XDG_RUNTIME_DIR = "/run/user/%i";
-        };
+        Environment = [
+          "WAYLAND_DISPLAY=wayland-0"
+          "XDG_RUNTIME_DIR=/run/user/%i"
+        ];
       };
     };
   };
