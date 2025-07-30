@@ -185,7 +185,7 @@ in {
     };
 
     # Ensure input group exists and user is added to it
-    users.users.${cfg.user} = mkIf (!(lib.elem cfg.user users.groups.input.members)) {
+    users.users.${cfg.user} = mkIf (!(lib.elem cfg.user config.users.groups.input.members)) {
       extraGroups = ["input"];
     };
   };
