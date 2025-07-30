@@ -316,3 +316,19 @@ void wayland_cleanup(void) {
     configured = false;
     bongocat_log_debug("Wayland cleanup complete");
 }
+
+void wayland_update_config(config_t *config) {
+    if (!config) {
+        bongocat_log_error("Cannot update wayland config: config is NULL");
+        return;
+    }
+    
+    bongocat_log_info("Updating wayland config");
+    current_config = config;
+    
+    // Trigger a redraw with the new config
+    if (configured) {
+        draw_bar();
+        bongocat_log_info("Wayland config updated and redrawn");
+    }
+}

@@ -29,6 +29,8 @@ obj/
 *.x86_64
 *.hex
 bongocat-v*
+bongocat
+!build/bongocat
 
 # Debug files
 *.dSYM/
@@ -50,6 +52,10 @@ dkms.conf
 *-protocol.h
 *-client-protocol.h
 
+# Generated embedded assets
+include/embedded_assets.h
+src/embedded_assets.c
+
 # IDE files
 .vscode/
 *.swp
@@ -59,3 +65,28 @@ dkms.conf
 # Build artifacts
 build/
 dist/
+
+# Nix build results
+result
+result-*
+
+# Nix development
+.direnv/
+.envrc
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Log files
+*.log

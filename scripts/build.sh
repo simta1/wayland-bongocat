@@ -12,4 +12,4 @@ make clean
 # Build the project
 make
 
-echo "Build complete! Run with: ./bongocat"
+echo "Build complete! Run with: bongocat"

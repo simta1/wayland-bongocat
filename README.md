@@ -1,488 +1,439 @@
 # Bongo Cat Wayland Overlay
 
-A Wayland overlay that displays an animated bongo cat reacting to keyboard input. Built with modern C11 standards and featuring a modular architecture, comprehensive error handling, and optimizations. Perfect for streamers, developers, or anyone who wants an adorable desktop companion!
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/saatvik333/wayland-bongocat/releases)
+
+A delightful Wayland overlay that displays an animated bongo cat reacting to your keyboard input! Perfect for streamers, content creators, or anyone who wants to add some fun to their desktop.
 
 ![Demo](assets/demo.gif)
 
-_Watch Bongo Cat react to your keystrokes in real-time!_
-
 ## ✨ Features
 
-### Core Functionality
+- **🎯 Real-time Animation** - Bongo cat reacts instantly to keyboard input
+- **🔥 Hot-Reload Configuration** - Modify settings without restarting (v1.2.0)
+- **🔄 Dynamic Device Detection** - Automatically detects Bluetooth/USB keyboards (v1.2.0)
+- **⚡ Performance Optimized** - Adaptive monitoring and batch processing (v1.2.0)
+- **🖥️ Wayland Native** - Built specifically for Wayland compositors
+- **💾 Lightweight** - Minimal resource usage (~2MB RAM)
+- **🎛️ Multi-device Support** - Monitor multiple keyboards simultaneously
+- **🎨 Embedded Assets** - No external dependencies
+- **🏗️ Cross-platform** - Works on x86_64 and ARM64
 
-- **Wayland Layer Shell Integration** - Professional overlay implementation
-- **Real-time Input Monitoring** - Responsive keyboard input detection
-- **Smooth Animation System** - 60 FPS animation with configurable timing
-- **Automatic Screen Detection** - Dynamic screen width detection (Hyprland support)
-- **Configurable Positioning** - Precise pixel-level control
+## 🚀 Installation
 
-### Professional Architecture
-
-- **Modular Codebase** - Clean separation of concerns across 7 modules
-- **Comprehensive Error Handling** - Detailed logging with timestamps
-- **Memory Management** - Built-in leak detection and cleanup
-- **Signal Handling** - Graceful shutdown and process management
-- **Configuration Validation** - Runtime validation with range checking
-
-## 📋 Requirements
-
-### System Dependencies
-
-- **Wayland Compositor** - Any Wayland-based desktop environment
-- **C11 Compiler** - GCC or Clang with C11 support
-- **Make** - GNU Make for building
-- **Wayland Development Libraries** - Core Wayland client libraries
-- **wayland-scanner** - Protocol code generation
-
-### Runtime Dependencies
-
-- **libwayland-client** - Wayland client library
-- **libm** - Math library (usually included)
-- **libpthread** - POSIX threads (usually included)
-- **hyprctl** - For automatic screen detection (Hyprland users)
-
-### Installation Commands
-
-#### Ubuntu/Debian
+### Arch Linux (Recommended)
 
 ```bash
+# Using yay
+yay -S bongocat
+
+# Using paru
+paru -S bongocat
+
+# Run immediately
+bongocat --watch-config
+
+# Custom config with hot-reload
+bongocat --config ~/.config/bongocat.conf --watch-config
+```
+
+### Other Distributions
+
+<details>
+<summary>Ubuntu/Debian</summary>
+
+```bash
+# Install dependencies
 sudo apt install libwayland-dev wayland-protocols build-essential
-```
 
-#### Arch Linux
+# Build from source
+git clone https://github.com/saatvik333/wayland-bongocat.git
+cd wayland-bongocat
+make
+
+# Run
+./build/bongocat
+```
+</details>
+
+<details>
+<summary>Fedora</summary>
 
 ```bash
-sudo pacman -S wayland wayland-protocols base-devel
-```
-
-#### Fedora
-
-```bash
+# Install dependencies
 sudo dnf install wayland-devel wayland-protocols-devel gcc make
-```
 
-## 🔨 Building
-
-### Quick Build
-
-```bash
-make
-```
-
-### Build Options
-
-```bash
-# Production build (default)
+# Build from source
+git clone https://github.com/saatvik333/wayland-bongocat.git
+cd wayland-bongocat
 make
 
-# Debug build with symbols
-make debug
-
-# Clean build artifacts
-make clean
-
-# Force rebuild
-make clean && make
+# Run
+./build/bongocat
 ```
+</details>
 
-### Build Process
-
-The Makefile automatically:
-
-1. **Generates Wayland protocol files** from XML specifications
-2. **Compiles source modules** with fast optimizations
-3. **Links the final executable** with required libraries
-4. **Applies security hardening** flags and optimizations
-
-### Compiler Flags Used
-
-- **Standards**: `-std=c11` (Modern C11 standard)
-- **Warnings**: `-Wall -Wextra -Wpedantic` (Comprehensive warnings)
-- **Security**: `-fstack-protector-strong -D_FORTIFY_SOURCE=2`
-- **Optimization**: `-O3 -flto -march=native` (Maximum performance)
-
-## 🚀 Usage
-
-### Basic Usage
+<details>
+<summary>NixOS</summary>
 
 ```bash
-# Run with default configuration
-./bongocat
+# Quick start with flakes
+nix run github:saatvik333/wayland-bongocat -- --watch-config
 
-# Show help information
-./bongocat --help
-
-# Display version information
-./bongocat --version
-
-# Use custom configuration file
-./bongocat --config my_config.conf
+# Install to user profile
+nix profile install github:saatvik333/wayland-bongocat
 ```
 
-### Command-Line Options
+📖 **For comprehensive NixOS setup, see [nix/NIXOS.md](nix/NIXOS.md)**
+</details>
 
-- `-h, --help` - Display help message and usage information
-- `-v, --version` - Show version and build information
-- `-c, --config FILE` - Specify custom configuration file path
+## 🎮 Quick Start
 
-### Expected Behavior
+### 1. Setup Permissions
 
-- The overlay appears as a transparent layer on your desktop
-- Bongo cat animates in response to keyboard input from any configured device
-- The overlay is click-through, allowing interaction with underlying windows
-- Runs continuously until terminated (Ctrl+C)
-- Logs activity to console (configurable verbosity)
+```bash
+# Add your user to the input group
+sudo usermod -a -G input $USER
+# Log out and back in for changes to take effect
+```
+
+### 2. Find Your Input Devices
+
+```bash
+# If installed via AUR
+bongocat-find-devices
+
+# If built from source
+./scripts/find_input_devices.sh
+```
+
+### 3. Run with Hot-Reload
+
+```bash
+# AUR installation
+bongocat --watch-config
+
+# From source
+./build/bongocat --watch-config
+```
 
 ## ⚙️ Configuration
 
-The application uses a comprehensive configuration system with runtime validation. Customize behavior using the `bongocat.conf` file in the project directory.
+Bongo Cat uses a simple configuration file format. With hot-reload enabled (`--watch-config`), changes apply instantly without restarting.
 
-### Configuration File Format
+### Basic Configuration
 
-The configuration file uses a simple key-value format with comments:
+Create or edit `bongocat.conf`:
 
 ```ini
-# Position settings (in pixels)
-cat_x_offset=150        # Horizontal offset from center (+ = right, - = left)
-cat_y_offset=0          # Vertical offset from center (+ = down, - = up)
-
-# Size settings
-cat_height=32           # Height of the bongo cat in pixels
-overlay_height=40       # Height of the entire overlay bar
+# Visual settings
+cat_height=50                    # Size of bongo cat (16-128)
+cat_x_offset=0                   # Horizontal position offset
+cat_y_offset=0                   # Vertical position offset
+overlay_opacity=150              # Background opacity (0-255)
 
 # Animation settings
-idle_frame=0            # Which frame to use when idle (0, 1, or 2)
+fps=60                           # Frame rate (1-120)
+keypress_duration=100            # Animation duration (ms)
+test_animation_interval=3        # Test animation every N seconds (0=off)
 
-# Animation timing (in milliseconds)
-keypress_duration=100   # How long to show animation after keypress
-test_animation_duration=200  # How long to show test animation
-test_animation_interval=3    # How often to trigger test animation (seconds, 0 = disabled)
+# Input devices (add multiple lines for multiple keyboards)
+keyboard_device=/dev/input/event4
+keyboard_device=/dev/input/event20  # External/Bluetooth keyboard
 
-# Performance settings
-fps=60                  # Animation frame rate (1-120 fps)
-
-# Visual settings
-overlay_opacity=150     # Background opacity (0-255, 0 = transparent, 255 = opaque)
-
-# Debug settings
-enable_debug=1          # Show debug messages (0 = off, 1 = on)
-
-# Input devices (supports multiple devices)
-keyboard_device=/dev/input/event4   # Path to your primary keyboard device
-# keyboard_device=/dev/input/event20 # External bluetooth keyboard
-# keyboard_device=/dev/input/event5  # Additional input device
+# Debug
+enable_debug=1                   # Show debug messages
 ```
 
-### New Features
+### Hot-Reload Features (v1.2.0)
 
-#### Multiple Input Device Support
-You can now monitor multiple input devices simultaneously. This is useful when you have:
-- Built-in laptop keyboard + external keyboard
-- Multiple keyboards connected
-- Different input devices you want to monitor
+When running with `--watch-config`:
+- ✨ **Real-time updates** - Edit config file, see changes instantly
+- 🔄 **Dynamic devices** - Bluetooth keyboards auto-detected when connected
+- 🎛️ **Visual feedback** - Opacity, size, and position changes apply immediately
+- 🚫 **No restart needed** - Perfect for fine-tuning your setup
 
-Simply add multiple `keyboard_device` lines in your configuration:
-```ini
-keyboard_device=/dev/input/event4   # Built-in keyboard
-keyboard_device=/dev/input/event20  # External bluetooth keyboard
-keyboard_device=/dev/input/event5   # Another input device
-```
+### Configuration Reference
 
-#### Click-Through Overlay
-The overlay is now click-through, meaning:
-- You can interact with windows and applications underneath the overlay
-- The bongo cat animation won't interfere with your workflow
-- Mouse clicks and keyboard input pass through to underlying applications
+| Setting | Type | Range | Default | Description |
+|---------|------|-------|---------|-------------|
+| `cat_height` | Integer | 16-128 | 50 | Height of bongo cat in pixels |
+| `cat_x_offset` | Integer | -9999 to 9999 | 0 | Horizontal offset from center |
+| `cat_y_offset` | Integer | -9999 to 9999 | 0 | Vertical offset from center |
+| `overlay_opacity` | Integer | 0-255 | 150 | Background opacity (0=transparent) |
+| `fps` | Integer | 1-120 | 60 | Animation frame rate |
+| `keypress_duration` | Integer | 50-5000 | 100 | Animation duration after keypress (ms) |
+| `test_animation_interval` | Integer | 0-60 | 3 | Test animation interval (seconds, 0=disabled) |
+| `keyboard_device` | String | Valid path | `/dev/input/event4` | Input device path (multiple allowed) |
+| `enable_debug` | Boolean | 0 or 1 | 0 | Enable debug logging |
 
-### Configuration Options Reference
+## 🔧 Usage
 
-| Setting                   | Type    | Range         | Default             | Description                                    |
-| ------------------------- | ------- | ------------- | ------------------- | ---------------------------------------------- |
-| `cat_x_offset`            | Integer | -9999 to 9999 | 150                 | Horizontal position offset from center         |
-| `cat_y_offset`            | Integer | -9999 to 9999 | 0                   | Vertical position offset from center           |
-| `cat_height`              | Integer | 16 to 128     | 32                  | Height of bongo cat in pixels                  |
-| `overlay_height`          | Integer | 20 to 200     | 40                  | Total overlay bar height                       |
-| `idle_frame`              | Integer | 0 to 2        | 0                   | Animation frame when idle                      |
-| `keypress_duration`       | Integer | 50 to 5000    | 100                 | Animation duration after keypress (ms)         |
-| `test_animation_duration` | Integer | 100 to 2000   | 200                 | Test animation duration (ms)                   |
-| `test_animation_interval` | Integer | 0 to 60       | 3                   | Test animation interval (seconds, 0=disabled)  |
-| `fps`                     | Integer | 1 to 120      | 60                  | Animation frame rate                           |
-| `overlay_opacity`         | Integer | 0 to 255      | 150                 | Background opacity (0=transparent, 255=opaque) |
-| `enable_debug`            | Boolean | 0 or 1        | 1                   | Enable debug logging                           |
-| `keyboard_device`         | String  | Valid path    | `/dev/input/event4` | Input device path (can specify multiple)      |
-
-### Animation Frame Reference
-
-- **Frame 0**: Both paws up (default idle state)
-- **Frame 1**: Left paw down (left key animation)
-- **Frame 2**: Right paw down (right key animation)
-
-### Automatic Features
-
-- **Screen Detection**: Automatically detects screen width using `hyprctl` (Hyprland)
-- **Configuration Validation**: All values are validated at runtime with helpful error messages
-- **Hot Reload**: Configuration changes require restart (planned feature for future versions)
-
-## 📁 Project Structure
-
-The project follows a modular architecture with clear separation of concerns:
-
-```text
-bongocat/
-├── src/                    # Source code modules
-│   ├── main.c             # Application entry point and coordination
-│   ├── wayland.c          # Wayland protocol handling and window management
-│   ├── animation.c        # Animation system with embedded asset loading
-│   ├── input.c            # Keyboard/mouse input monitoring
-│   ├── config.c           # Configuration file parsing and validation
-│   ├── error.c            # Comprehensive error handling and logging
-│   ├── memory.c           # Memory management with leak detection
-│   └── embedded_assets.c  # Generated embedded asset data (auto-generated)
-├── include/               # Header files and interfaces
-│   ├── bongocat.h         # Common definitions and shared structures
-│   ├── wayland.h          # Wayland interface declarations
-│   ├── animation.h        # Animation system interface
-│   ├── input.h            # Input monitoring interface
-│   ├── config.h           # Configuration system interface
-│   ├── error.h            # Error handling interface
-│   ├── memory.h           # Memory management interface
-│   └── embedded_assets.h  # Generated embedded asset headers (auto-generated)
-├── lib/                   # Third-party libraries
-│   ├── stb_image.h        # STB image loading library
-│   └── stb_image_resize.h # STB image resize library
-├── protocols/             # Wayland protocol files (auto-generated)
-│   ├── wlr-layer-shell-unstable-v1.xml    # Layer shell protocol spec
-│   ├── xdg-shell-client-protocol.h        # Generated XDG shell header
-│   ├── xdg-shell-protocol.c               # Generated XDG shell code
-│   ├── zwlr-layer-shell-v1-client-protocol.h  # Generated layer shell header
-│   └── zwlr-layer-shell-v1-protocol.c     # Generated layer shell code
-├── scripts/               # Build and utility scripts
-│   └── embed_assets.sh    # Asset embedding script (converts PNGs to C arrays)
-├── assets/                # Source animation frame images
-│   ├── bongo-cat-both-up.png     # Idle state (both paws up)
-│   ├── bongo-cat-left-down.png   # Left paw animation
-│   ├── bongo-cat-right-down.png  # Right paw animation
-│   ├── bongocat.gif       # Demo animation
-│   └── demo.gif           # Usage demonstration
-├── obj/                   # Compiled object files (created during build)
-├── bongocat              # Final standalone executable (created during build)
-├── bongocat.conf         # User configuration file
-├── Makefile              # Production-grade build system with asset embedding
-├── build.sh              # Convenience build script
-└── README.md             # This documentation
-```
-
-### Module Responsibilities
-
-| Module          | Purpose               | Key Functions                         |
-| --------------- | --------------------- | ------------------------------------- |
-| **main.c**      | Application lifecycle | Initialization, main loop, cleanup    |
-| **wayland.c**   | Wayland integration   | Layer shell setup, surface management |
-| **animation.c** | Animation engine      | Frame management, timing, rendering   |
-| **input.c**     | Input monitoring      | Device polling, event processing      |
-| **config.c**    | Configuration         | File parsing, validation, defaults    |
-| **error.c**     | Error handling        | Logging, error codes, diagnostics     |
-| **memory.c**    | Memory management     | Allocation tracking, leak detection   |
-
-## 🎨 Assets
-
-The project includes high-quality animation frames:
-
-- **`bongo-cat-both-up.png`** - Default idle state (both paws raised)
-- **`bongo-cat-left-down.png`** - Left paw down animation frame
-- **`bongo-cat-right-down.png`** - Right paw down animation frame
-
-### Asset Specifications
-
-- **Format**: PNG with transparency (embedded in binary)
-- **Recommended Size**: 32x32 pixels (configurable)
-- **Color Depth**: 32-bit RGBA
-- **Optimization**: Embedded directly in binary for standalone execution
-
-## 🔧 Troubleshooting
-
-### Common Issues and Solutions
-
-#### Permission Errors
-
-**Problem**: `Permission denied` when accessing `/dev/input/event4`
-
-**Solutions**:
-
-1. **Add user to input group** (recommended):
-
-   ```bash
-   sudo usermod -a -G input $USER
-   # Log out and back in for changes to take effect
-   ```
-
-2. **Run with elevated permissions** (temporary):
-
-   ```bash
-   sudo ./bongocat
-   ```
-
-3. **Use udev rules** (system-wide):
-   ```bash
-   # Create udev rule for input access
-   echo 'KERNEL=="event*", GROUP="input", MODE="0664"' | sudo tee /etc/udev/rules.d/99-input.rules
-   sudo udevadm control --reload-rules
-   ```
-
-#### Input Device Detection
-
-**Problem**: Keyboard input not detected or wrong device
-
-**Diagnosis**:
+### Command Line Options
 
 ```bash
-# List all input devices
-ls -la /dev/input/
+bongocat [OPTIONS]
+
+Options:
+  -h, --help              Show help message
+  -v, --version           Show version information
+  -c, --config FILE       Use custom config file
+  -w, --watch-config      Enable hot-reload (recommended)
+```
+
+### Examples
+
+```bash
+# Basic usage
+bongocat
+
+# With hot-reload (recommended)
+bongocat --watch-config
+
+# Custom config with hot-reload
+bongocat --config ~/.config/bongocat.conf --watch-config
+
+# Debug mode
+bongocat --watch-config --config bongocat.conf
+```
+
+## 🛠️ Building from Source
+
+### Prerequisites
+
+**Required:**
+- Wayland compositor with layer shell support
+- C11 compiler (GCC 4.9+ or Clang 3.4+)
+- Make
+- libwayland-client
+- wayland-protocols
+- wayland-scanner
+
+**Optional:**
+- hyprctl (for automatic screen detection on Hyprland)
+
+### Build Process
+
+```bash
+# Clone repository
+git clone https://github.com/saatvik333/wayland-bongocat.git
+cd wayland-bongocat
+
+# Build (production)
+make
+
+# Build (debug)
+make debug
+
+# Clean
+make clean
+```
+
+The build process automatically:
+1. Generates Wayland protocol files
+2. Compiles with optimizations and security hardening
+3. Embeds assets directly in the binary
+4. Links with required libraries
+
+## 🔍 Device Discovery
+
+The `bongocat-find-devices` tool provides professional input device analysis with a clean, user-friendly interface:
+
+```bash
+$ bongocat-find-devices
+
+╔══════════════════════════════════════════════════════════════════╗
+║ Wayland Bongo Cat - Input Device Discovery v1.2.0                ║
+╚══════════════════════════════════════════════════════════════════╝
+
+[SCAN] Scanning for input devices...
+
+[DEVICES] Found Input Devices:
+┌─────────────────────────────────────────────────────────────────┐
+│ Device: AT Translated Set 2 keyboard                            │
+│ Path:   /dev/input/event4                                       │
+│ Type:   Keyboard                                                │
+│ Status: [OK] Accessible                                         │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│ Device: Logitech MX Keys                                        │
+│ Path:   /dev/input/event20                                      │
+│ Type:   Keyboard (Bluetooth)                                    │
+│ Status: [OK] Accessible                                         │
+└─────────────────────────────────────────────────────────────────┘
+
+[CONFIG] Configuration Suggestions:
+Add these lines to your bongocat.conf:
+
+keyboard_device=/dev/input/event4   # AT Translated Set 2 keyboard
+keyboard_device=/dev/input/event20  # Logitech MX Keys
+```
+
+### Advanced Features
+
+```bash
+# Show all input devices (including mice, touchpads)
+bongocat-find-devices --all
+
+# Generate complete configuration file
+bongocat-find-devices --generate-config > bongocat.conf
+
+# Test device responsiveness (requires root)
+sudo bongocat-find-devices --test
 
 # Show detailed device information
-cat /proc/bus/input/devices
+bongocat-find-devices --verbose
 
-# Monitor input events (requires root)
-sudo evtest
+# Get help and usage information
+bongocat-find-devices --help
 ```
 
-**Solution**: Update `keyboard_device` entries in `bongocat.conf` with the correct device paths.
+### Key Features
 
-#### Multiple Input Devices
+- **Smart Detection** - Automatically identifies keyboards vs other input devices
+- **Device Classification** - Distinguishes between built-in, Bluetooth, and USB keyboards
+- **Permission Checking** - Verifies device accessibility and provides fix suggestions
+- **Config Generation** - Creates ready-to-use configuration snippets
+- **Device Testing** - Integrated evtest functionality for troubleshooting
+- **Professional UI** - Clean, colorized output with status indicators
+- **Error Handling** - Comprehensive error messages and troubleshooting guidance
 
-**Problem**: Only one keyboard works, external keyboard not detected
+## 📊 Performance
 
-**Solution**: Add multiple `keyboard_device` lines in your configuration:
-```ini
-keyboard_device=/dev/input/event4   # Built-in keyboard
-keyboard_device=/dev/input/event20  # External keyboard
-```
+### System Requirements
+- **CPU:** Any modern x86_64 or ARM64 processor
+- **RAM:** ~2MB runtime usage
+- **Storage:** ~1.2MB executable size
+- **Compositor:** Wayland with layer shell protocol support
 
-**Finding device paths**:
+### Performance Metrics (v1.2.0)
+- **Input Latency:** <1ms with batch processing
+- **CPU Usage:** <1% on modern systems
+- **Device Monitoring:** Adaptive 5-30 second intervals
+- **Memory:** Optimized with leak detection
+
+### Tested Compositors
+- ✅ **Hyprland** - Full support with screen detection
+- ✅ **Sway** - Full support
+- ✅ **Wayfire** - Compatible
+- ⚠️ **KDE Wayland** - Limited layer shell support
+- ❌ **GNOME Wayland** - No layer shell support
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+<details>
+<summary>Permission denied accessing /dev/input/eventX</summary>
+
+**Solution:**
 ```bash
-# Use the included helper script
-./scripts/find_input_devices.sh
+# Add user to input group (recommended)
+sudo usermod -a -G input $USER
+# Log out and back in
 
-# Or manually:
-# List input devices with names
-cat /proc/bus/input/devices | grep -E "(Name|Handlers)"
+# Or create udev rule
+echo 'KERNEL=="event*", GROUP="input", MODE="0664"' | sudo tee /etc/udev/rules.d/99-input.rules
+sudo udevadm control --reload-rules
+```
+</details>
 
-# Test which device generates events
-sudo evtest
+<details>
+<summary>Keyboard input not detected</summary>
+
+**Diagnosis:**
+```bash
+# Find correct device
+bongocat-find-devices
+
+# Test device manually
+sudo evtest /dev/input/event4
 ```
 
-#### Click-Through Issues
+**Solution:** Update `keyboard_device` in `bongocat.conf` with correct path.
+</details>
 
-**Problem**: Can't click through the overlay to underlying windows
+<details>
+<summary>Overlay not visible or clickable</summary>
 
-**Solution**: This should work automatically with the new implementation. If you experience issues:
-- Ensure you're using a compatible Wayland compositor (Hyprland, Sway, Wayfire)
-- Check that the overlay layer is set to OVERLAY (this is automatic)
-- Verify your compositor supports the layer shell protocol
+**Check:**
+- Ensure compositor supports `wlr-layer-shell-unstable-v1`
+- Verify `WAYLAND_DISPLAY` environment variable is set
+- Try different `overlay_opacity` values
 
-#### Build Errors
+**Tested compositors:** Hyprland, Sway, Wayfire
+</details>
 
-**Problem**: Compilation fails with missing dependencies
+<details>
+<summary>Build errors</summary>
 
-**Solutions**:
-
-- **Missing Wayland headers**: Install development packages (see Requirements section)
-- **Compiler too old**: Ensure GCC 4.9+ or Clang 3.4+ for C11 support
-- **Protocol generation fails**: Install `wayland-scanner` package
-
-#### Runtime Issues
-
-**Problem**: Application crashes or doesn't display
-
-**Debugging steps**:
-
-1. **Enable debug logging**:
-
-   ```bash
-   ./bongocat --config bongocat.conf  # Ensure enable_debug=1
-   ```
-
-2. **Check Wayland compositor**:
-
-   ```bash
-   echo $WAYLAND_DISPLAY  # Should show wayland-0 or similar
-   ```
-
-3. **Verify layer shell support**:
-   - Ensure your compositor supports `wlr-layer-shell-unstable-v1`
-   - Tested with: Hyprland, Sway, Wayfire
-
-#### Performance Issues
-
-**Problem**: High CPU usage or stuttering animation
-
-**Solutions**:
-
-- Lower `fps` setting in configuration (try 30 FPS)
-- Increase `keypress_duration` to reduce animation frequency
-- Disable `test_animation_interval` (set to 0)
-- Use release build instead of debug build
+**Common fixes:**
+- Install development packages: `libwayland-dev wayland-protocols`
+- Ensure C11 compiler: GCC 4.9+ or Clang 3.4+
+- Install `wayland-scanner` package
+</details>
 
 ### Getting Help
 
-If you encounter issues not covered here:
+1. Enable debug logging: `bongocat --watch-config` (ensure `enable_debug=1`)
+2. Check compositor compatibility
+3. Verify all dependencies are installed
+4. Test with minimal configuration
 
-1. **Check the logs** - Enable debug mode for detailed output
-2. **Verify your setup** - Ensure all dependencies are installed
-3. **Test minimal config** - Try with default configuration
-4. **Check compositor compatibility** - Verify layer shell support
+## 🏗️ Architecture
 
-## 📊 Performance & Specifications
+### Project Structure
+```
+wayland-bongocat/
+├── src/                 # Source code
+│   ├── main.c          # Application entry point
+│   ├── config.c        # Configuration management
+│   ├── config_watcher.c # Hot-reload system (v1.2.0)
+│   ├── input.c         # Input device monitoring
+│   ├── wayland.c       # Wayland protocol handling
+│   └── ...
+├── include/            # Header files
+├── scripts/            # Build and utility scripts
+├── assets/             # Animation frames
+├── protocols/          # Generated Wayland protocols
+└── nix/               # NixOS integration
+```
 
-### System Requirements
+### Key Features (v1.2.0)
+- **Hot-reload system** using inotify file monitoring
+- **Dynamic device detection** with adaptive intervals
+- **Batch event processing** for improved performance
+- **Thread-safe configuration** management
+- **Optimized I/O** with larger buffers
 
-- **CPU**: Any modern x86_64 or ARM64 processor
-- **RAM**: ~2MB runtime memory usage
-- **Storage**: ~1.1MB executable size
-- **Compositor**: Wayland with layer shell protocol support
+## 🤝 Contributing
 
-### Performance Characteristics
+This project follows industry best practices with a modular architecture. Contributions are welcome!
 
-- **Startup Time**: <100ms typical
-- **CPU Usage**: <1% on modern systems
-- **Memory Usage**: ~2MB RSS (with leak detection)
-- **Animation Smoothness**: 60 FPS with vsync support
+### Development Setup
+```bash
+git clone https://github.com/saatvik333/wayland-bongocat.git
+cd wayland-bongocat
+make debug
+```
 
-### Tested Environments
-
-- **Hyprland** ✅ Full support with screen detection
-- **Sway** ✅ Full support
-- **Wayfire** ✅ Compatible
-- **KDE Wayland** ⚠️ Limited layer shell support
-- **GNOME Wayland** ❌ No layer shell support
-
-## 🚀 Development
-
-### Code Quality Standards
-
-- **C11 Standard** - Modern C with strict compliance
-- **Memory Safety** - Comprehensive leak detection and bounds checking
-- **Error Handling** - All functions return proper error codes
-- **Documentation** - Extensive inline comments and documentation
-- **Testing** - Build with optimization flags
-
-### Build System Features
-
-- **Dependency Tracking** - Automatic rebuilds on header changes
-- **Protocol Generation** - Automatic Wayland protocol code generation
-- **Optimization Levels** - Debug and release build configurations
-- **Static Analysis** - Comprehensive compiler warnings enabled
-
-### Contributing
-
-This is a codebase following industry best practices. The modular architecture makes it easy to extend with new features or adapt for different use cases.
+### Code Standards
+- C11 standard compliance
+- Comprehensive error handling
+- Memory safety with leak detection
+- Extensive documentation
 
 ## 📄 License
 
-This project is open source and available under a permissive license. Feel free to modify, distribute, and use in your own projects.
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+Built with ❤️ for the Wayland community. Special thanks to:
+- Redditor: [u/akonzu](https://www.reddit.com/user/akonzu/) for the inspiration
+- All the contributors and users
 
 ---
 
-**Built with ❤️ for the Wayland community**
-
-_Bongo Cat Overlay v1.1.0_
+**₍^. .^₎  Wayland Bongo Cat Overlay v1.2.0** - Making desktops more delightful, one keystroke at a time! 

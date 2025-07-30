@@ -8,9 +8,11 @@
 #include "memory.h"
 #include <signal.h>
 #include <sys/wait.h>
+#include <stdbool.h>
 
 static volatile sig_atomic_t running = 1;
 static config_t g_config;
+static ConfigWatcher g_config_watcher;
 
 static void signal_handler(int sig) {
     switch (sig) {
@@ -27,6 +29,63 @@ static void signal_handler(int sig) {
             bongocat_log_warning("Received unexpected signal %d", sig);
             break;
     }
+}
+
+static void config_reload_callback(const char *config_path) {
+    bongocat_log_info("Reloading configuration from: %s", config_path);
+    
+    // Create a temporary config to test loading
+    config_t temp_config;
+    bongocat_error_t result = load_config(&temp_config, config_path);
+    
+    if (result != BONGOCAT_SUCCESS) {
+        bongocat_log_error("Failed to reload config: %s", bongocat_error_string(result));
+        bongocat_log_info("Keeping current configuration");
+        return;
+    }
+    
+    // If successful, update the global config
+    config_t old_config = g_config;
+    g_config = temp_config;
+    
+    // Update the running systems with new config
+    wayland_update_config(&g_config);
+    
+    // Check if input devices changed and restart monitoring if needed
+    bool devices_changed = false;
+    if (old_config.num_keyboard_devices != g_config.num_keyboard_devices) {
+        devices_changed = true;
+    } else {
+        // Check if any device paths changed
+        for (int i = 0; i < g_config.num_keyboard_devices; i++) {
+            bool found = false;
+            for (int j = 0; j < old_config.num_keyboard_devices; j++) {
+                if (strcmp(g_config.keyboard_devices[i], old_config.keyboard_devices[j]) == 0) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                devices_changed = true;
+                break;
+            }
+        }
+    }
+    
+    if (devices_changed) {
+        bongocat_log_info("Input devices changed, restarting input monitoring");
+        bongocat_error_t input_result = input_restart_monitoring(g_config.keyboard_devices, 
+                                                                g_config.num_keyboard_devices, 
+                                                                g_config.enable_debug);
+        if (input_result != BONGOCAT_SUCCESS) {
+            bongocat_log_error("Failed to restart input monitoring: %s", bongocat_error_string(input_result));
+        } else {
+            bongocat_log_info("Input monitoring restarted successfully");
+        }
+    }
+    
+    bongocat_log_info("Configuration reloaded successfully!");
+    bongocat_log_info("New screen dimensions: %dx%d", g_config.screen_width, g_config.bar_height);
 }
 
 static bongocat_error_t setup_signal_handlers(void) {
@@ -61,6 +120,9 @@ static bongocat_error_t setup_signal_handlers(void) {
 static void cleanup_and_exit(int exit_code) {
     bongocat_log_info("Performing cleanup...");
     
+    // Stop config watcher
+    config_watcher_cleanup(&g_config_watcher);
+    
     // Stop animation system
     animation_cleanup();
     
@@ -92,23 +154,25 @@ int main(int argc, char *argv[]) {
     // Initialize error system early
     bongocat_error_init(1); // Enable debug initially
     
-    bongocat_log_info("Starting Bongo Cat Overlay v1.1");
+    bongocat_log_info("Starting Bongo Cat Overlay v" BONGOCAT_VERSION);
     
     // Parse command line arguments
     const char *config_file = NULL;
+    bool watch_config = false;
     
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             printf("Bongo Cat Wayland Overlay\n");
             printf("Usage: %s [options]\n", argv[0]);
             printf("Options:\n");
-            printf("  -h, --help     Show this help message\n");
-            printf("  -v, --version  Show version information\n");
-            printf("  -c, --config   Specify config file (default: bongocat.conf)\n");
+            printf("  -h, --help         Show this help message\n");
+            printf("  -v, --version      Show version information\n");
+            printf("  -c, --config       Specify config file (default: bongocat.conf)\n");
+            printf("  -w, --watch-config Watch config file for changes and reload automatically\n");
             printf("\nConfiguration is loaded from bongocat.conf in the current directory.\n");
             return 0;
         } else if (strcmp(argv[i], "--version") == 0 || strcmp(argv[i], "-v") == 0) {
-            printf("Bongo Cat Overlay v1.1\n");
+            printf("Bongo Cat Overlay v" BONGOCAT_VERSION "\n");
             printf("Built with fast optimizations\n");
             return 0;
         } else if (strcmp(argv[i], "--config") == 0 || strcmp(argv[i], "-c") == 0) {
@@ -119,6 +183,8 @@ int main(int argc, char *argv[]) {
                 bongocat_log_error("--config option requires a file path");
                 return 1;
             }
+        } else if (strcmp(argv[i], "--watch-config") == 0 || strcmp(argv[i], "-w") == 0) {
+            watch_config = true;
         } else {
             bongocat_log_warning("Unknown argument: %s", argv[i]);
         }
@@ -139,6 +205,17 @@ int main(int argc, char *argv[]) {
     }
     
     bongocat_log_info("Screen dimensions: %dx%d", g_config.screen_width, g_config.bar_height);
+    
+    // Initialize config watcher if requested
+    if (watch_config) {
+        const char *watch_path = config_file ? config_file : "bongocat.conf";
+        if (config_watcher_init(&g_config_watcher, watch_path, config_reload_callback) == 0) {
+            config_watcher_start(&g_config_watcher);
+            bongocat_log_info("Config file watching enabled for: %s", watch_path);
+        } else {
+            bongocat_log_warning("Failed to initialize config watcher, continuing without hot-reload");
+        }
+    }
     
     // Initialize Wayland
     result = wayland_init(&g_config);

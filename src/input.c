@@ -8,6 +8,7 @@
 #include <sys/types.h>
 #include <signal.h>
 #include <unistd.h>
+#include <stdbool.h>
 
 int *any_key_pressed;
 static pid_t input_child_pid = -1;
@@ -61,20 +62,27 @@ static void capture_input_multiple(char **device_paths, int num_devices, int ena
     
     bongocat_log_info("Successfully opened %d/%d input devices", valid_devices, num_devices);
 
-    struct input_event ev[64];
+    struct input_event ev[128]; // Increased buffer size for better I/O efficiency
     int rd;
     fd_set readfds;
     struct timeval timeout;
+    int check_counter = 0;
+    int adaptive_check_interval = 5; // Start with 5 seconds, can increase to 30
     
     while (1) {
         FD_ZERO(&readfds);
         
-        // Add all valid file descriptors to the set
+        // Optimize: only rebuild fd_set when devices change, track current max_fd
+        int current_max_fd = -1;
         for (int i = 0; i < num_devices; i++) {
             if (fds[i] >= 0) {
                 FD_SET(fds[i], &readfds);
+                if (fds[i] > current_max_fd) {
+                    current_max_fd = fds[i];
+                }
             }
         }
+        max_fd = current_max_fd;
         
         timeout.tv_sec = 1;
         timeout.tv_usec = 0;
@@ -86,7 +94,45 @@ static void capture_input_multiple(char **device_paths, int num_devices, int ena
             break;
         }
         
-        if (select_result == 0) continue; // Timeout
+        if (select_result == 0) {
+            // Adaptive device checking - start at 5 seconds, increase to 30 if no new devices found
+            check_counter++;
+            if (check_counter >= adaptive_check_interval) {
+                check_counter = 0;
+                bool found_new_device = false;
+                
+                // Check for devices that have become available
+                for (int i = 0; i < num_devices; i++) {
+                    if (fds[i] < 0) { // Device was not available before
+                        struct stat st;
+                        if (stat(device_paths[i], &st) == 0 && S_ISCHR(st.st_mode)) {
+                            // Device is now available, try to open it
+                            int new_fd = open(device_paths[i], O_RDONLY | O_NONBLOCK);
+                            if (new_fd >= 0) {
+                                fds[i] = new_fd;
+                                if (new_fd > max_fd) {
+                                    max_fd = new_fd;
+                                }
+                                valid_devices++;
+                                found_new_device = true;
+                                bongocat_log_info("New input device detected and opened: %s (fd=%d)", device_paths[i], new_fd);
+                            }
+                        }
+                    }
+                }
+                
+                // Adaptive interval: if no new devices found, increase check interval up to 30 seconds
+                if (!found_new_device && adaptive_check_interval < 30) {
+                    adaptive_check_interval = (adaptive_check_interval < 15) ? 15 : 30;
+                    bongocat_log_debug("Increased device check interval to %d seconds", adaptive_check_interval);
+                } else if (found_new_device && adaptive_check_interval > 5) {
+                    // Reset to frequent checking when devices are being connected
+                    adaptive_check_interval = 5;
+                    bongocat_log_debug("Reset device check interval to 5 seconds");
+                }
+            }
+            continue; // Continue to next iteration
+        }
         
         // Check which devices have data
         for (int i = 0; i < num_devices; i++) {
@@ -109,14 +155,23 @@ static void capture_input_multiple(char **device_paths, int num_devices, int ena
                     continue;
                 }
 
-                for (int j = 0; j < (int)(rd / sizeof(struct input_event)); j++) {
+                // Batch process events for better performance
+                int num_events = rd / sizeof(struct input_event);
+                bool key_pressed = false;
+                
+                for (int j = 0; j < num_events; j++) {
                     if (ev[j].type == EV_KEY && ev[j].value == 1) {
+                        key_pressed = true;
                         if (enable_debug) {
                             bongocat_log_debug("Key event: device=%s, code=%d, time=%ld.%06ld", 
                                              device_paths[i], ev[j].code, ev[j].time.tv_sec, ev[j].time.tv_usec);
                         }
-                        animation_trigger();
                     }
+                }
+                
+                // Trigger animation only once per batch to reduce overhead
+                if (key_pressed) {
+                    animation_trigger();
                 }
             }
         }
@@ -175,6 +230,76 @@ bongocat_error_t input_start_monitoring(char **device_paths, int num_devices, in
     }
     
     bongocat_log_info("Input monitoring started (child PID: %d)", input_child_pid);
+    return BONGOCAT_SUCCESS;
+}
+
+bongocat_error_t input_restart_monitoring(char **device_paths, int num_devices, int enable_debug) {
+    bongocat_log_info("Restarting input monitoring system");
+    
+    // Stop current monitoring
+    if (input_child_pid > 0) {
+        bongocat_log_debug("Stopping current input monitoring (PID: %d)", input_child_pid);
+        kill(input_child_pid, SIGTERM);
+        
+        // Wait for child to terminate with timeout
+        int status;
+        int wait_attempts = 0;
+        while (wait_attempts < 10) {
+            pid_t result = waitpid(input_child_pid, &status, WNOHANG);
+            if (result == input_child_pid) {
+                bongocat_log_debug("Previous input monitoring process terminated");
+                break;
+            } else if (result == -1) {
+                bongocat_log_warning("Error waiting for input child process: %s", strerror(errno));
+                break;
+            }
+            
+            usleep(100000); // Wait 100ms
+            wait_attempts++;
+        }
+        
+        // Force kill if still running
+        if (wait_attempts >= 10) {
+            bongocat_log_warning("Force killing previous input monitoring process");
+            kill(input_child_pid, SIGKILL);
+            waitpid(input_child_pid, &status, 0);
+        }
+        
+        input_child_pid = -1;
+    }
+    
+    // Start new monitoring (reuse shared memory if it exists)
+    bool need_new_shm = (any_key_pressed == NULL || any_key_pressed == MAP_FAILED);
+    
+    if (need_new_shm) {
+        any_key_pressed = (int *)mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE, 
+                                     MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+        if (any_key_pressed == MAP_FAILED) {
+            bongocat_log_error("Failed to create shared memory for input monitoring: %s", strerror(errno));
+            return BONGOCAT_ERROR_MEMORY;
+        }
+        *any_key_pressed = 0;
+    }
+
+    // Fork new process for input monitoring
+    input_child_pid = fork();
+    if (input_child_pid < 0) {
+        bongocat_log_error("Failed to fork input monitoring process: %s", strerror(errno));
+        if (need_new_shm) {
+            munmap(any_key_pressed, sizeof(int));
+            any_key_pressed = NULL;
+        }
+        return BONGOCAT_ERROR_THREAD;
+    }
+    
+    if (input_child_pid == 0) {
+        // Child process - handle keyboard input from multiple devices
+        bongocat_log_debug("Input monitoring child process restarted (PID: %d)", getpid());
+        capture_input_multiple(device_paths, num_devices, enable_debug);
+        exit(0);
+    }
+    
+    bongocat_log_info("Input monitoring restarted (child PID: %d)", input_child_pid);
     return BONGOCAT_SUCCESS;
 }
 
