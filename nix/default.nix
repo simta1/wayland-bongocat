@@ -8,7 +8,7 @@
   wayland-protocols,
   wayland-scanner,
 }:
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "wayland-bongocat";
   version = "1.2.0";
 
