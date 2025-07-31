@@ -135,6 +135,10 @@ in {
   };
 
   config = mkIf cfg.enable {
+    # Place the configuration file in "~/.config"
+    # Allows the user to easily start Bongocat manually with the config they defined in Nix
+    xdg.configFile."bongocat.conf" = configFile;
+
     # Install the package system-wide
     environment.systemPackages = [
       cfg.package
