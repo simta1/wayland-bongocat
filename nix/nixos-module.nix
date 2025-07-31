@@ -65,6 +65,18 @@ in {
       description = "Enable debug logging";
     };
 
+    # Overlay
+    overlayHeight = mkOption {
+      type = types.int;
+      default = 60;
+      description = "Height of the entire overlay bar";
+    };
+    overlayOpacity = mkOption {
+      type = types.int;
+      default = 0;
+      description = "Overlay background opacity (0-255, 0 = transparent)";
+    };
+
     # Position
     catXOffset = mkOption {
       type = types.int;
@@ -82,11 +94,6 @@ in {
       type = types.int;
       default = 40;
       description = "Height of the bongo cat in pixels";
-    };
-    overlayHeight = mkOption {
-      type = types.int;
-      default = 60;
-      description = "Height of the entire overlay bar";
     };
 
     # Animations
@@ -116,12 +123,6 @@ in {
       type = types.int;
       default = 60;
       description = "Animation framerate (FPS)";
-    };
-
-    overlayOpacity = mkOption {
-      type = types.int;
-      default = 0;
-      description = "Overlay background opacity (0-255, 0 = transparent)";
     };
 
     # Input devices
