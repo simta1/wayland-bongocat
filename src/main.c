@@ -1,4 +1,5 @@
 #define _POSIX_C_SOURCE 200809L
+#define _DEFAULT_SOURCE
 #include "bongocat.h"
 #include "wayland.h"
 #include "animation.h"
@@ -9,10 +10,123 @@
 #include <signal.h>
 #include <sys/wait.h>
 #include <stdbool.h>
+#include <sys/file.h>
+#include <unistd.h>
+#include <stdlib.h>
 
 static volatile sig_atomic_t running = 1;
 static config_t g_config;
 static ConfigWatcher g_config_watcher;
+
+#define PID_FILE "/tmp/bongocat.pid"
+
+static int create_pid_file(void) {
+    int fd = open(PID_FILE, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    if (fd < 0) {
+        bongocat_log_error("Failed to create PID file: %s", strerror(errno));
+        return -1;
+    }
+    
+    if (flock(fd, LOCK_EX | LOCK_NB) < 0) {
+        close(fd);
+        if (errno == EWOULDBLOCK) {
+            bongocat_log_info("Another instance is already running");
+            return -2; // Already running
+        }
+        bongocat_log_error("Failed to lock PID file: %s", strerror(errno));
+        return -1;
+    }
+    
+    char pid_str[32];
+    snprintf(pid_str, sizeof(pid_str), "%d\n", getpid());
+    if (write(fd, pid_str, strlen(pid_str)) < 0) {
+        bongocat_log_error("Failed to write PID to file: %s", strerror(errno));
+        close(fd);
+        return -1;
+    }
+    
+    return fd; // Keep file descriptor open to maintain lock
+}
+
+static void remove_pid_file(void) {
+    unlink(PID_FILE);
+}
+
+static pid_t get_running_pid(void) {
+    int fd = open(PID_FILE, O_RDONLY);
+    if (fd < 0) {
+        return -1; // No PID file exists
+    }
+    
+    // Try to get a shared lock to read the file
+    if (flock(fd, LOCK_SH | LOCK_NB) < 0) {
+        close(fd);
+        if (errno == EWOULDBLOCK) {
+            // File is locked by another process, so it's running
+            // We need to read the PID anyway, so let's try without lock
+            fd = open(PID_FILE, O_RDONLY);
+            if (fd < 0) return -1;
+        } else {
+            return -1;
+        }
+    }
+    
+    char pid_str[32];
+    ssize_t bytes_read = read(fd, pid_str, sizeof(pid_str) - 1);
+    close(fd);
+    
+    if (bytes_read <= 0) {
+        return -1;
+    }
+    
+    pid_str[bytes_read] = '\0';
+    pid_t pid = (pid_t)atoi(pid_str);
+    
+    if (pid <= 0) {
+        return -1;
+    }
+    
+    // Check if process is actually running
+    if (kill(pid, 0) == 0) {
+        return pid; // Process is running
+    }
+    
+    // Process is not running, remove stale PID file
+    remove_pid_file();
+    return -1;
+}
+
+static int handle_toggle(void) {
+    pid_t running_pid = get_running_pid();
+    
+    if (running_pid > 0) {
+        // Process is running, kill it
+        bongocat_log_info("Stopping bongocat (PID: %d)", running_pid);
+        if (kill(running_pid, SIGTERM) == 0) {
+            // Wait a bit for graceful shutdown
+            for (int i = 0; i < 50; i++) { // Wait up to 5 seconds
+                if (kill(running_pid, 0) != 0) {
+                    bongocat_log_info("Bongocat stopped successfully");
+                    return 0;
+                }
+                usleep(100000); // 100ms
+            }
+            
+            // Force kill if still running
+            bongocat_log_warning("Force killing bongocat");
+            kill(running_pid, SIGKILL);
+            bongocat_log_info("Bongocat force stopped");
+        } else {
+            bongocat_log_error("Failed to stop bongocat: %s", strerror(errno));
+            return 1;
+        }
+    } else {
+        bongocat_log_info("Bongocat is not running, starting it now");
+        return -1; // Signal to continue with normal startup
+    }
+    
+    return 0;
+}
 
 static void signal_handler(int sig) {
     switch (sig) {
@@ -120,6 +234,9 @@ static bongocat_error_t setup_signal_handlers(void) {
 static void cleanup_and_exit(int exit_code) {
     bongocat_log_info("Performing cleanup...");
     
+    // Remove PID file
+    remove_pid_file();
+    
     // Stop config watcher
     config_watcher_cleanup(&g_config_watcher);
     
@@ -159,6 +276,7 @@ int main(int argc, char *argv[]) {
     // Parse command line arguments
     const char *config_file = NULL;
     bool watch_config = false;
+    bool toggle_mode = false;
     
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
@@ -169,6 +287,7 @@ int main(int argc, char *argv[]) {
             printf("  -v, --version      Show version information\n");
             printf("  -c, --config       Specify config file (default: bongocat.conf)\n");
             printf("  -w, --watch-config Watch config file for changes and reload automatically\n");
+            printf("  --toggle           Toggle bongocat on/off (start if not running, stop if running)\n");
             printf("\nConfiguration is loaded from bongocat.conf in the current directory.\n");
             return 0;
         } else if (strcmp(argv[i], "--version") == 0 || strcmp(argv[i], "-v") == 0) {
@@ -185,15 +304,36 @@ int main(int argc, char *argv[]) {
             }
         } else if (strcmp(argv[i], "--watch-config") == 0 || strcmp(argv[i], "-w") == 0) {
             watch_config = true;
+        } else if (strcmp(argv[i], "--toggle") == 0) {
+            toggle_mode = true;
         } else {
             bongocat_log_warning("Unknown argument: %s", argv[i]);
         }
+    }
+    
+    // Handle toggle mode
+    if (toggle_mode) {
+        int toggle_result = handle_toggle();
+        if (toggle_result >= 0) {
+            return toggle_result; // Either successfully toggled off or error
+        }
+        // toggle_result == -1 means continue with startup
     }
     
     // Setup signal handlers
     result = setup_signal_handlers();
     if (result != BONGOCAT_SUCCESS) {
         bongocat_log_error("Failed to setup signal handlers: %s", bongocat_error_string(result));
+        return 1;
+    }
+    
+    // Create PID file to track this instance
+    int pid_fd = create_pid_file();
+    if (pid_fd == -2) {
+        bongocat_log_error("Another instance of bongocat is already running");
+        return 1;
+    } else if (pid_fd < 0) {
+        bongocat_log_error("Failed to create PID file");
         return 1;
     }
     

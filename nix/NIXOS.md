@@ -1,8 +1,6 @@
 # NixOS Installation Guide
 > [!WARNING]
-> I don't use nor tested nix os, this guide may contain wrong information, if you find something wrong open a PR with the changes.
-
-This guide covers various ways to install and use wayland-bongocat on NixOS.
+> This hasn't been thoroughly tested on NixOS therefore this guide may contain misinformation, please open a PR with the changes if you find something wrong.
 
 ## Quick Start
 
@@ -90,7 +88,7 @@ sudo nixos-rebuild switch
 
 ### Using Flakes in NixOS
 
-If you use flakes for your NixOS configuration:
+If you use flakes for your NixOS configuration (Which you should):
 
 ```nix
 # In your flake.nix

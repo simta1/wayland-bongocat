@@ -77,6 +77,12 @@ static bongocat_error_t validate_config(config_t *config) {
     // Validate enable_debug
     config->enable_debug = config->enable_debug ? 1 : 0;
     
+    // Validate overlay_position
+    if (config->overlay_position != POSITION_TOP && config->overlay_position != POSITION_BOTTOM) {
+        bongocat_log_warning("Invalid overlay_position %d, resetting to top", config->overlay_position);
+        config->overlay_position = POSITION_TOP;
+    }
+    
     // Validate cat positioning doesn't go off-screen
     if (abs(config->cat_x_offset) > config->screen_width) {
         bongocat_log_warning("cat_x_offset %d may position cat off-screen (screen width: %d)", 
@@ -149,6 +155,15 @@ static bongocat_error_t parse_config_file(config_t *config, const char *config_f
                 config->overlay_opacity = (int)strtol(value, NULL, 10);
             } else if (strcmp(key_start, "enable_debug") == 0) {
                 config->enable_debug = (int)strtol(value, NULL, 10);
+            } else if (strcmp(key_start, "overlay_position") == 0) {
+                if (strcmp(value, "top") == 0) {
+                    config->overlay_position = POSITION_TOP;
+                } else if (strcmp(value, "bottom") == 0) {
+                    config->overlay_position = POSITION_BOTTOM;
+                } else {
+                    bongocat_log_warning("Invalid overlay_position '%s', using 'top'", value);
+                    config->overlay_position = POSITION_TOP;
+                }
             } else if (strcmp(key_start, "keyboard_device") == 0 || strcmp(key_start, "keyboard_devices") == 0) {
                 // Reallocate device array
                 config_keyboard_devices = realloc(config_keyboard_devices, 
@@ -211,7 +226,8 @@ bongocat_error_t load_config(config_t *config, const char *config_file_path) {
         .test_animation_interval = 3,
         .fps = 60,
         .overlay_opacity = 150,
-        .enable_debug = 1
+        .enable_debug = 1,
+        .overlay_position = POSITION_TOP
     };
     
     // Set default keyboard device if none specified
@@ -254,6 +270,7 @@ bongocat_error_t load_config(config_t *config, const char *config_file_path) {
                       config->cat_height, (config->cat_height * 954) / 393,
                       config->cat_x_offset, config->cat_y_offset);
     bongocat_log_debug("  FPS: %d, Opacity: %d", config->fps, config->overlay_opacity);
+    bongocat_log_debug("  Position: %s", config->overlay_position == POSITION_TOP ? "top" : "bottom");
     
     return BONGOCAT_SUCCESS;
 }
@@ -269,7 +286,7 @@ void config_cleanup(void) {
 }
 
 int get_screen_width(void) {
-    FILE *fp = popen("/usr/bin/hyprctl monitors active", "r");
+    FILE *fp = popen("hyprctl monitors active", "r");
     if (!fp) {
         return DEFAULT_SCREEN_WIDTH;
     }

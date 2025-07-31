@@ -160,9 +160,16 @@ bongocat_error_t wayland_init(config_t *config) {
         return BONGOCAT_ERROR_WAYLAND;
     }
 
-    zwlr_layer_surface_v1_set_anchor(layer_surface, ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP |
-                                                    ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT |
-                                                    ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT);
+    // Set anchor based on configured position
+    uint32_t anchor = ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT | ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT;
+    if (config->overlay_position == POSITION_TOP) {
+        anchor |= ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP;
+        bongocat_log_debug("Setting overlay position to top");
+    } else {
+        anchor |= ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM;
+        bongocat_log_debug("Setting overlay position to bottom");
+    }
+    zwlr_layer_surface_v1_set_anchor(layer_surface, anchor);
     zwlr_layer_surface_v1_set_size(layer_surface, 0, config->bar_height);
     zwlr_layer_surface_v1_set_exclusive_zone(layer_surface, -1);
     zwlr_layer_surface_v1_set_margin(layer_surface, 0, 0, 0, 0);
