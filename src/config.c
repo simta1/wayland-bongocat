@@ -205,6 +205,16 @@ static bongocat_error_t parse_config_file(config_t *config, const char *config_f
 bongocat_error_t load_config(config_t *config, const char *config_file_path) {
     BONGOCAT_CHECK_NULL(config, BONGOCAT_ERROR_INVALID_PARAM);
     
+    // Clear existing keyboard devices to prevent accumulation during reloads
+    if (config_keyboard_devices) {
+        for (int i = 0; i < config_num_devices; i++) {
+            BONGOCAT_SAFE_FREE(config_keyboard_devices[i]);
+        }
+        BONGOCAT_SAFE_FREE(config_keyboard_devices);
+        config_keyboard_devices = NULL;
+        config_num_devices = 0;
+    }
+    
     // Initialize with defaults
     *config = (config_t) {
         .screen_width = get_screen_width(),
