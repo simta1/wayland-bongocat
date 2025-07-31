@@ -17,8 +17,6 @@
         default = bongocat;
         wayland-bongocat = bongocat;
       };
-
-      nixosModules.default = import ./nix/nixos-module.nix;
       apps = {
         default = inputs.flake-utils.lib.mkApp {
           drv = bongocat;
@@ -30,5 +28,6 @@
           name = "bongocat-find-devices";
         };
       };
-    });
+    })
+    // {nixosModules.default = import ./nix/nixos-module.nix;};
 }
