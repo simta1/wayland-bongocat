@@ -131,7 +131,7 @@ cat_height=50                    # Size of bongo cat (16-128)
 cat_x_offset=0                   # Horizontal position offset
 cat_y_offset=0                   # Vertical position offset
 overlay_opacity=150              # Background opacity (0-255)
-overlay_position=top             # Position on screen (top/bottom)
+overlay_position=top             # Position on screen (top/
 
 # Animation settings
 fps=60                           # Frame rate (1-120)
