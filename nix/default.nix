@@ -42,9 +42,7 @@ stdenv.mkDerivation {
     # Ensure that the Makefile has the correct directory with the Wayland protocols
     export WAYLAND_PROTOCOLS_DIR="${wayland-protocols}/share/wayland-protocols"
 
-    # Generate protocol files, embedded assets and build the app
-    make protocols
-    make embed-assets
+    # Compile with all optimizations (Longer compile time, improved performance)
     make release
 
     runHook postBuild
@@ -58,14 +56,12 @@ stdenv.mkDerivation {
     mkdir -p $out/share/bongocat
     mkdir -p $out/share/doc/bongocat
 
-    # Install binary
+    # Install binaries
     cp build/bongocat $out/bin/
+    cp scripts/find_input_devices.sh $out/bin/bongocat-find-devices
 
     # Install configuration example
     cp bongocat.conf $out/share/bongocat/bongocat.conf.example
-
-    # Install helper script
-    cp scripts/find_input_devices.sh $out/bin/bongocat-find-devices
 
     # Install documentation
     cp README.md $out/share/doc/bongocat/
@@ -73,23 +69,4 @@ stdenv.mkDerivation {
 
     runHook postInstall
   '';
-
-  meta = with lib; {
-    description = "A Wayland overlay that displays an animated bongo cat reacting to keyboard input";
-    longDescription = ''
-      Bongo Cat Wayland Overlay is a fun desktop companion that shows an animated
-      bongo cat reacting to your keyboard input in real-time. Features include:
-
-      - Real-time keyboard input monitoring from multiple devices
-      - Click-through overlay that doesn't interfere with your workflow
-      - Configurable positioning, size, and animation settings
-      - Support for multiple input devices (built-in + external keyboards)
-      - Professional C11 codebase with comprehensive error handling
-    '';
-    homepage = "https://github.com/saatvik333/wayland-bongocat";
-    license = licenses.mit;
-    maintainers = [];
-    platforms = platforms.linux;
-    mainProgram = "bongocat";
-  };
 }

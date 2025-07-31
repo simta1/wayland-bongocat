@@ -164,12 +164,6 @@ in {
       cfg.package
 
       # Helper scripts
-      # For finding input devices
-      (pkgs.writeScriptBin "bongocat-find-devices" ''
-        #!${pkgs.bash}/bin/bash
-        exec ${cfg.package}/bin/bongocat-find-devices "$@"
-      '')
-
       # For starting `wayland-bongocat` using the config file defined with Nix
       (pkgs.writeScriptBin "bongocat-exec" ''
         #!${pkgs.bash}/bin/bash
