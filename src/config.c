@@ -77,6 +77,15 @@ static bongocat_error_t validate_config(config_t *config) {
     // Validate enable_debug
     config->enable_debug = config->enable_debug ? 1 : 0;
     
+    // Validate hide_on_fullscreen
+    config->hide_on_fullscreen = config->hide_on_fullscreen ? 1 : 0;
+    
+    // Validate layer
+    if (config->layer != LAYER_TOP && config->layer != LAYER_OVERLAY) {
+        bongocat_log_warning("Invalid layer %d, resetting to top", config->layer);
+        config->layer = LAYER_TOP;
+    }
+    
     // Validate overlay_position
     if (config->overlay_position != POSITION_TOP && config->overlay_position != POSITION_BOTTOM) {
         bongocat_log_warning("Invalid overlay_position %d, resetting to top", config->overlay_position);
@@ -155,6 +164,17 @@ static bongocat_error_t parse_config_file(config_t *config, const char *config_f
                 config->overlay_opacity = (int)strtol(value, NULL, 10);
             } else if (strcmp(key_start, "enable_debug") == 0) {
                 config->enable_debug = (int)strtol(value, NULL, 10);
+            } else if (strcmp(key_start, "hide_on_fullscreen") == 0) {
+                config->hide_on_fullscreen = (int)strtol(value, NULL, 10);
+            } else if (strcmp(key_start, "layer") == 0) {
+                if (strcmp(value, "top") == 0) {
+                    config->layer = LAYER_TOP;
+                } else if (strcmp(value, "overlay") == 0) {
+                    config->layer = LAYER_OVERLAY;
+                } else {
+                    bongocat_log_warning("Invalid layer '%s', using 'top'", value);
+                    config->layer = LAYER_TOP;
+                }
             } else if (strcmp(key_start, "overlay_position") == 0) {
                 if (strcmp(value, "top") == 0) {
                     config->overlay_position = POSITION_TOP;
@@ -237,6 +257,8 @@ bongocat_error_t load_config(config_t *config, const char *config_file_path) {
         .fps = 60,
         .overlay_opacity = 150,
         .enable_debug = 1,
+        .hide_on_fullscreen = 1,
+        .layer = LAYER_TOP,  // Default to TOP for broader compatibility
         .overlay_position = POSITION_TOP
     };
     
@@ -281,6 +303,8 @@ bongocat_error_t load_config(config_t *config, const char *config_file_path) {
                       config->cat_x_offset, config->cat_y_offset);
     bongocat_log_debug("  FPS: %d, Opacity: %d", config->fps, config->overlay_opacity);
     bongocat_log_debug("  Position: %s", config->overlay_position == POSITION_TOP ? "top" : "bottom");
+    bongocat_log_debug("  Layer: %s", config->layer == LAYER_TOP ? "top" : "overlay");
+    bongocat_log_debug("  Hide on fullscreen: %s", config->hide_on_fullscreen ? "enabled" : "disabled");
     
     return BONGOCAT_SUCCESS;
 }

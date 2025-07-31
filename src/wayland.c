@@ -1,19 +1,84 @@
 #define _POSIX_C_SOURCE 200809L
 #include "wayland.h"
 #include "animation.h"
+#include <poll.h>
+#include <sys/time.h>
 
 // Wayland globals
 bool configured = false;
+bool fullscreen_detected = false;
 struct wl_display *display;
 struct wl_compositor *compositor;
 struct wl_shm *shm;
 struct zwlr_layer_shell_v1 *layer_shell;
+struct xdg_wm_base *xdg_wm_base;
 struct wl_surface *surface;
-struct wl_buffer *buffer;
+struct wl_buffer *buffer;wlr-foreign-toplevel-management-v1 protocol
 struct zwlr_layer_surface_v1 *layer_surface;
 uint8_t *pixels;
 
 static config_t *current_config;
+
+// Function to check if any window is fullscreen (compositor-specific)
+static bool check_fullscreen_status(void) {
+    // Only check for fullscreen when using OVERLAY layer with fullscreen detection enabled
+    if (current_config->layer != LAYER_OVERLAY || !current_config->hide_on_fullscreen) {
+        bongocat_log_debug("Fullscreen detection disabled (layer=%s, hide_on_fullscreen=%d)", 
+                          current_config->layer == LAYER_OVERLAY ? "overlay" : "top",
+                          current_config->hide_on_fullscreen);
+        return false;
+    }
+    
+    // Try Hyprland first
+    FILE *fp = popen("hyprctl activewindow 2>/dev/null", "r");
+    if (fp) {
+        char line[512];
+        bool is_fullscreen = false;
+        
+        bongocat_log_debug("Checking Hyprland for fullscreen status");
+        while (fgets(line, sizeof(line), fp)) {
+            // Remove newline for cleaner logging
+            size_t len = strlen(line);
+            if (len > 0 && line[len-1] == '\n') {
+                line[len-1] = '\0';
+            }
+            
+            bongocat_log_debug("Hyprctl line: %s", line);
+            // Check for any fullscreen mode (1 = real fullscreen, 2 = fake fullscreen)
+            if (strstr(line, "fullscreen: 1") || strstr(line, "fullscreen: 2") || strstr(line, "fullscreen: true")) {
+                is_fullscreen = true;
+                bongocat_log_debug("Fullscreen detected in Hyprland");
+                break;
+            }
+        }
+        pclose(fp);
+        bongocat_log_debug("Hyprland fullscreen check result: %s", is_fullscreen ? "true" : "false");
+        return is_fullscreen;
+    }
+    
+    // Try sway as fallback
+    bongocat_log_debug("Hyprland not available, trying Sway");
+    fp = popen("swaymsg -t get_tree 2>/dev/null", "r");
+    if (fp) {
+        char sway_buffer[4096];
+        bool is_fullscreen = false;
+        
+        while (fgets(sway_buffer, sizeof(sway_buffer), fp)) {
+            if (strstr(sway_buffer, "\"fullscreen_mode\":1")) {
+                is_fullscreen = true;
+                bongocat_log_debug("Fullscreen detected in Sway");
+                break;
+            }
+        }
+        pclose(fp);
+        bongocat_log_debug("Sway fullscreen check result: %s", is_fullscreen ? "true" : "false");
+        return is_fullscreen;
+    }
+    
+    // If no compositor detection works, assume not fullscreen
+    bongocat_log_debug("No supported compositor found for fullscreen detection");
+    return false;
+}
 
 int create_shm(int size) {
     char name[] = "/bar-shm-XXXXXX";
@@ -44,25 +109,46 @@ void draw_bar(void) {
         return;
     }
 
+    // Determine effective opacity based on fullscreen detection (only for OVERLAY layer)
+    int effective_opacity = current_config->overlay_opacity;
+    bool should_hide_overlay = (current_config->layer == LAYER_OVERLAY && 
+                               current_config->hide_on_fullscreen && 
+                               fullscreen_detected);
+    
+    if (should_hide_overlay) {
+        effective_opacity = 0;
+        bongocat_log_debug("Fullscreen detected, hiding overlay (opacity=0)");
+    }
+
     // Clear entire buffer with configurable transparency
     for (int i = 0; i < current_config->screen_width * current_config->bar_height * 4; i += 4) {
         pixels[i] = 0;       // B
         pixels[i + 1] = 0;   // G
         pixels[i + 2] = 0;   // R
-        pixels[i + 3] = current_config->overlay_opacity; // A (configurable transparency)
+        pixels[i + 3] = effective_opacity; // A (configurable transparency, 0 when fullscreen)
     }
 
-    pthread_mutex_lock(&anim_lock);
-    // Use configured cat height
-    int cat_height = current_config->cat_height;
-    int cat_width = (cat_height * 779) / 320;  // Maintain 954:393 ratio
-    int cat_x = (current_config->screen_width - cat_width) / 2 + current_config->cat_x_offset;
-    int cat_y = (current_config->bar_height - cat_height) / 2 + current_config->cat_y_offset;
+    // Only draw the cat if not in fullscreen mode (only applies to OVERLAY layer with fullscreen detection enabled)
+    bool should_hide_cat = (current_config->layer == LAYER_OVERLAY && 
+                           current_config->hide_on_fullscreen && 
+                           fullscreen_detected);
+    
+    if (!should_hide_cat) {
+        pthread_mutex_lock(&anim_lock);
+        // Use configured cat height
+        int cat_height = current_config->cat_height;
+        int cat_width = (cat_height * 779) / 320;  // Maintain 954:393 ratio
+        int cat_x = (current_config->screen_width - cat_width) / 2 + current_config->cat_x_offset;
+        int cat_y = (current_config->bar_height - cat_height) / 2 + current_config->cat_y_offset;
 
-    blit_image_scaled(pixels, current_config->screen_width, current_config->bar_height,
-                      anim_imgs[anim_index], anim_width[anim_index], anim_height[anim_index],
-                      cat_x, cat_y, cat_width, cat_height);
-    pthread_mutex_unlock(&anim_lock);
+        blit_image_scaled(pixels, current_config->screen_width, current_config->bar_height,
+                          anim_imgs[anim_index], anim_width[anim_index], anim_height[anim_index],
+                          cat_x, cat_y, cat_width, cat_height);
+        pthread_mutex_unlock(&anim_lock);
+        bongocat_log_debug("Cat drawn (fullscreen_detected=%s)", fullscreen_detected ? "true" : "false");
+    } else {
+        bongocat_log_debug("Cat drawing skipped due to fullscreen detection");
+    }
 
     wl_surface_attach(surface, buffer, 0, 0);
     wl_surface_damage_buffer(surface, 0, 0, current_config->screen_width, current_config->bar_height);
@@ -84,6 +170,15 @@ static struct zwlr_layer_surface_v1_listener layer_listener = {
     .closed = NULL,
 };
 
+// XDG shell handlers for fullscreen detection
+static void xdg_wm_base_ping(void *data __attribute__((unused)), struct xdg_wm_base *wm_base, uint32_t serial) {
+    xdg_wm_base_pong(wm_base, serial);
+}
+
+static struct xdg_wm_base_listener xdg_wm_base_listener = {
+    .ping = xdg_wm_base_ping,
+};
+
 static void registry_global(void *data __attribute__((unused)), struct wl_registry *reg, uint32_t name,
                            const char *iface, uint32_t ver __attribute__((unused))) {
     if (strcmp(iface, wl_compositor_interface.name) == 0) {
@@ -92,6 +187,11 @@ static void registry_global(void *data __attribute__((unused)), struct wl_regist
         shm = (struct wl_shm *)wl_registry_bind(reg, name, &wl_shm_interface, 1);
     } else if (strcmp(iface, zwlr_layer_shell_v1_interface.name) == 0) {
         layer_shell = (struct zwlr_layer_shell_v1 *)wl_registry_bind(reg, name, &zwlr_layer_shell_v1_interface, 1);
+    } else if (strcmp(iface, xdg_wm_base_interface.name) == 0) {
+        xdg_wm_base = (struct xdg_wm_base *)wl_registry_bind(reg, name, &xdg_wm_base_interface, 1);
+        if (xdg_wm_base) {
+            xdg_wm_base_add_listener(xdg_wm_base, &xdg_wm_base_listener, NULL);
+        }
     }
 }
 
@@ -148,8 +248,16 @@ bongocat_error_t wayland_init(config_t *config) {
         return BONGOCAT_ERROR_WAYLAND;
     }
 
+    // Use configurable layer - TOP for broader compatibility, OVERLAY for advanced compositors
+    uint32_t layer_type = (config->layer == LAYER_OVERLAY) ? 
+                         ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY : 
+                         ZWLR_LAYER_SHELL_V1_LAYER_TOP;
+    
     layer_surface = zwlr_layer_shell_v1_get_layer_surface(layer_shell, surface, NULL,
-                                                          ZWLR_LAYER_SHELL_V1_LAYER_TOP, "bongocat-overlay");
+                                                          layer_type, "bongocat-overlay");
+    
+    bongocat_log_debug("Using layer: %s", 
+                      (config->layer == LAYER_OVERLAY) ? "OVERLAY" : "TOP");
     if (!layer_surface) {
         bongocat_log_error("Failed to create layer surface");
         wl_surface_destroy(surface);
@@ -246,19 +354,67 @@ bongocat_error_t wayland_run(volatile sig_atomic_t *running) {
     BONGOCAT_CHECK_NULL(running, BONGOCAT_ERROR_INVALID_PARAM);
 
     bongocat_log_info("Starting Wayland event loop");
+    
+    struct timeval last_fullscreen_check = {0};
+    const int fullscreen_check_interval_ms = 500; // Check every 500ms
 
     while (*running && display) {
-        int ret = wl_display_dispatch(display);
-        if (ret == -1) {
-            int err = wl_display_get_error(display);
-            if (err == EPROTO) {
-                bongocat_log_error("Wayland protocol error");
+        // Check for fullscreen status periodically
+        struct timeval now;
+        gettimeofday(&now, NULL);
+        long elapsed_ms = (now.tv_sec - last_fullscreen_check.tv_sec) * 1000 + 
+                         (now.tv_usec - last_fullscreen_check.tv_usec) / 1000;
+        
+        if (elapsed_ms >= fullscreen_check_interval_ms) {
+            bongocat_log_debug("Performing fullscreen check (interval: %dms)", fullscreen_check_interval_ms);
+            bool new_fullscreen_state = check_fullscreen_status();
+            if (new_fullscreen_state != fullscreen_detected) {
+                fullscreen_detected = new_fullscreen_state;
+                bongocat_log_info("Fullscreen state changed: %s", 
+                                 fullscreen_detected ? "detected" : "cleared");
+                // Trigger a redraw with the new state
+                if (configured) {
+                    bongocat_log_debug("Triggering redraw due to fullscreen state change");
+                    draw_bar();
+                }
+            }
+            last_fullscreen_check = now;
+        }
+
+        // Use non-blocking dispatch with timeout
+        struct pollfd pfd = {
+            .fd = wl_display_get_fd(display),
+            .events = POLLIN,
+        };
+        
+        // Prepare display for reading
+        while (wl_display_prepare_read(display) != 0) {
+            if (wl_display_dispatch_pending(display) == -1) {
+                bongocat_log_error("Failed to dispatch pending events");
                 return BONGOCAT_ERROR_WAYLAND;
-            } else if (err == EPIPE) {
-                bongocat_log_warning("Wayland display connection lost");
-                return BONGOCAT_SUCCESS; // Graceful shutdown
-            } else {
-                bongocat_log_error("Wayland dispatch error: %s", strerror(err));
+            }
+        }
+        
+        // Poll with timeout to allow periodic fullscreen checks
+        int poll_result = poll(&pfd, 1, 100); // 100ms timeout
+        
+        if (poll_result > 0) {
+            if (wl_display_read_events(display) == -1) {
+                bongocat_log_error("Failed to read Wayland events");
+                return BONGOCAT_ERROR_WAYLAND;
+            }
+            if (wl_display_dispatch_pending(display) == -1) {
+                bongocat_log_error("Failed to dispatch Wayland events");
+                return BONGOCAT_ERROR_WAYLAND;
+            }
+        } else if (poll_result == 0) {
+            // Timeout - cancel the read
+            wl_display_cancel_read(display);
+        } else {
+            // Error
+            wl_display_cancel_read(display);
+            if (errno != EINTR) {
+                bongocat_log_error("Poll error: %s", strerror(errno));
                 return BONGOCAT_ERROR_WAYLAND;
             }
         }
@@ -305,6 +461,11 @@ void wayland_cleanup(void) {
         layer_shell = NULL;
     }
 
+    if (xdg_wm_base) {
+        xdg_wm_base_destroy(xdg_wm_base);
+        xdg_wm_base = NULL;
+    }
+
     if (shm) {
         wl_shm_destroy(shm);
         shm = NULL;
@@ -321,6 +482,7 @@ void wayland_cleanup(void) {
     }
 
     configured = false;
+    fullscreen_detected = false;
     bongocat_log_debug("Wayland cleanup complete");
 }
 
