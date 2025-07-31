@@ -149,7 +149,7 @@ bongocat_error_t wayland_init(config_t *config) {
     }
 
     layer_surface = zwlr_layer_shell_v1_get_layer_surface(layer_shell, surface, NULL,
-                                                          ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM, "bongocat-overlay");
+                                                          ZWLR_LAYER_SHELL_V1_LAYER_TOP, "bongocat-overlay");
     if (!layer_surface) {
         bongocat_log_error("Failed to create layer surface");
         wl_surface_destroy(surface);
