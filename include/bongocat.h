@@ -23,7 +23,7 @@
 #include "../lib/stb_image.h"
 
 // Version
-#define BONGOCAT_VERSION "1.2"
+#define BONGOCAT_VERSION "1.2.1"
 
 // Common constants
 #define NUM_FRAMES 3
