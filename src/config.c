@@ -269,7 +269,7 @@ void config_cleanup(void) {
 }
 
 int get_screen_width(void) {
-    FILE *fp = popen("/usr/bin/hyprctl monitors active", "r");
+    FILE *fp = popen("hyprctl monitors active", "r");
     if (!fp) {
         return DEFAULT_SCREEN_WIDTH;
     }
