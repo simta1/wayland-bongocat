@@ -135,18 +135,21 @@ in {
   };
 
   config = mkIf cfg.enable {
-    # Place the configuration file in "~/.config"
-    # Allows the user to easily start Bongocat manually with the config they defined in Nix
-    xdg.configFile."bongocat.conf" = configFile;
-
     # Install the package system-wide
     environment.systemPackages = [
       cfg.package
 
-      # Helper script for finding input devices
+      # Helper scripts
+      # For finding input devices
       (pkgs.writeScriptBin "bongocat-find-devices" ''
         #!${pkgs.bash}/bin/bash
         exec ${cfg.package}/bin/bongocat-find-devices "$@"
+      '')
+
+      # For starting `wayland-bongocat` using the config file defined with Nix
+      (pkgs.writeScriptBin "bongocat-exec" ''
+        #!${pkgs.bash}/bin/bash
+        exec ${cfg.package}/bin/bongocat --config ${configFile}
       '')
     ];
 
