@@ -6,13 +6,9 @@
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = {
-    self,
-    nixpkgs,
-    flake-utils,
-  }:
-    flake-utils.lib.eachDefaultSystem (system: let
-      pkgs = nixpkgs.legacyPackages.${system};
+  outputs = inputs:
+    inputs.flake-utils.lib.eachDefaultSystem (system: let
+      pkgs = inputs.nixpkgs.legacyPackages.${system};
       bongocat = pkgs.callPackage ./nix/default.nix {};
     in {
       formatter = pkgs.alejandra;
@@ -21,19 +17,18 @@
         default = bongocat;
         wayland-bongocat = bongocat;
       };
+
+      nixosModules.default = import ./nix/nixos-module.nix;
       apps = {
-        default = flake-utils.lib.mkApp {
+        default = inputs.flake-utils.lib.mkApp {
           drv = bongocat;
           name = "bongocat";
         };
 
-        find-devices = flake-utils.lib.mkApp {
+        find-devices = inputs.flake-utils.lib.mkApp {
           drv = bongocat;
           name = "bongocat-find-devices";
         };
       };
-    })
-    // {
-      nixosModules.default = import ./nix/nixos-module.nix;
-    };
+    });
 }
