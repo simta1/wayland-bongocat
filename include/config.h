@@ -4,6 +4,11 @@
 #include "bongocat.h"
 #include "error.h"
 
+typedef enum {
+    POSITION_TOP = 0,
+    POSITION_BOTTOM = 1
+} overlay_position_t;
+
 typedef struct {
     int screen_width;
     int bar_height;
@@ -21,6 +26,7 @@ typedef struct {
     int fps;
     int overlay_opacity;
     int enable_debug;
+    overlay_position_t overlay_position;
 } config_t;
 
 bongocat_error_t load_config(config_t *config, const char *config_file_path);

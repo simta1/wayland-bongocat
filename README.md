@@ -131,6 +131,7 @@ cat_height=50                    # Size of bongo cat (16-128)
 cat_x_offset=0                   # Horizontal position offset
 cat_y_offset=0                   # Vertical position offset
 overlay_opacity=150              # Background opacity (0-255)
+overlay_position=top             # Position on screen (top/bottom)
 
 # Animation settings
 fps=60                           # Frame rate (1-120)
@@ -161,6 +162,7 @@ When running with `--watch-config`:
 | `cat_x_offset` | Integer | -9999 to 9999 | 0 | Horizontal offset from center |
 | `cat_y_offset` | Integer | -9999 to 9999 | 0 | Vertical offset from center |
 | `overlay_opacity` | Integer | 0-255 | 150 | Background opacity (0=transparent) |
+| `overlay_position` | String | "top" or "bottom" | "top" | Position of overlay on screen |
 | `fps` | Integer | 1-120 | 60 | Animation frame rate |
 | `keypress_duration` | Integer | 50-5000 | 100 | Animation duration after keypress (ms) |
 | `test_animation_interval` | Integer | 0-60 | 3 | Test animation interval (seconds, 0=disabled) |
