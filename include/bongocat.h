@@ -1,21 +1,21 @@
 #ifndef BONGOCAT_H
 #define BONGOCAT_H
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <linux/input.h>
+#include <pthread.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <errno.h>
+#include <sys/inotify.h>
+#include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/time.h>
-#include <sys/ioctl.h>
-#include <pthread.h>
-#include <linux/input.h>
-#include <sys/inotify.h>
+#include <unistd.h>
 
 #define _POSIX_C_SOURCE 200809L
 #include <wayland-client.h>
@@ -36,16 +36,17 @@
 
 // Config watcher structure
 typedef struct {
-    int inotify_fd;
-    int watch_fd;
-    pthread_t watcher_thread;
-    bool watching;
-    char *config_path;
-    void (*reload_callback)(const char *config_path);
+  int inotify_fd;
+  int watch_fd;
+  pthread_t watcher_thread;
+  bool watching;
+  char *config_path;
+  void (*reload_callback)(const char *config_path);
 } ConfigWatcher;
 
 // Config watcher function declarations
-int config_watcher_init(ConfigWatcher *watcher, const char *config_path, void (*callback)(const char *));
+int config_watcher_init(ConfigWatcher *watcher, const char *config_path,
+                        void (*callback)(const char *));
 void config_watcher_start(ConfigWatcher *watcher);
 void config_watcher_stop(ConfigWatcher *watcher);
 void config_watcher_cleanup(ConfigWatcher *watcher);

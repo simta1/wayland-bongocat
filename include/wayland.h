@@ -1,11 +1,11 @@
 #ifndef WAYLAND_H
 #define WAYLAND_H
 
+#include "../protocols/zwlr-layer-shell-v1-client-protocol.h"
 #include "bongocat.h"
 #include "config.h"
 #include "error.h"
 #include <signal.h>
-#include "../protocols/zwlr-layer-shell-v1-client-protocol.h"
 
 // Wayland globals
 extern struct wl_display *display;

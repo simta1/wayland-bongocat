@@ -4,29 +4,26 @@
 #include "bongocat.h"
 #include "error.h"
 
-typedef enum {
-    POSITION_TOP = 0,
-    POSITION_BOTTOM = 1
-} overlay_position_t;
+typedef enum { POSITION_TOP = 0, POSITION_BOTTOM = 1 } overlay_position_t;
 
 typedef struct {
-    int screen_width;
-    int bar_height;
-    const char *asset_paths[NUM_FRAMES];
-    char **keyboard_devices;
-    int num_keyboard_devices;
-    int cat_x_offset;
-    int cat_y_offset;
-    int cat_height;
-    int overlay_height;
-    int idle_frame;
-    int keypress_duration;
-    int test_animation_duration;
-    int test_animation_interval;
-    int fps;
-    int overlay_opacity;
-    int enable_debug;
-    overlay_position_t overlay_position;
+  int screen_width;
+  int bar_height;
+  const char *asset_paths[NUM_FRAMES];
+  char **keyboard_devices;
+  int num_keyboard_devices;
+  int cat_x_offset;
+  int cat_y_offset;
+  int cat_height;
+  int overlay_height;
+  int idle_frame;
+  int keypress_duration;
+  int test_animation_duration;
+  int test_animation_interval;
+  int fps;
+  int overlay_opacity;
+  int enable_debug;
+  overlay_position_t overlay_position;
 } config_t;
 
 bongocat_error_t load_config(config_t *config, const char *config_file_path);
