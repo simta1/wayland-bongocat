@@ -16,10 +16,10 @@ void animation_cleanup(void);
 void animation_trigger(void);
 
 void blit_image_scaled(uint8_t *dest, int dest_w, int dest_h,
-                       unsigned char *src, int src_w, int src_h, int offset_x,
-                       int offset_y, int target_w, int target_h);
+                      unsigned char *src, int src_w, int src_h,
+                      int offset_x, int offset_y, int target_w, int target_h);
 
-void draw_rect(uint8_t *dest, int width, int height, int x, int y, int w, int h,
-               uint8_t r, uint8_t g, uint8_t b, uint8_t a);
+void draw_rect(uint8_t *dest, int width, int height, int x, int y, 
+               int w, int h, uint8_t r, uint8_t g, uint8_t b, uint8_t a);
 
 #endif // ANIMATION_H
