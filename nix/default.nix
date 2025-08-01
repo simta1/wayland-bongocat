@@ -1,72 +1,48 @@
 {
   lib,
   stdenv,
-  gcc,
-  gnumake,
   pkg-config,
   wayland,
   wayland-protocols,
   wayland-scanner,
 }:
-stdenv.mkDerivation {
+stdenv.mkDerivation (finalAttrs: {
   pname = "wayland-bongocat";
   version = "1.2.1";
-
   src = ../.;
 
-  nativeBuildInputs = [
-    gcc
-    gnumake
-    pkg-config
-    wayland-scanner
-    wayland-protocols
-  ];
-
+  # Build toolchain and dependencies
+  nativeBuildInputs = [pkg-config];
   buildInputs = [
     wayland
     wayland-protocols
+    wayland-scanner
   ];
 
+  # Build phases
+  # Ensure that the Makefile has the correct directory with the Wayland protocols
   preBuild = ''
-    # Ensure build directory exists
-    mkdir -p build/obj
-
-    # Make scripts executable
-    chmod +x scripts/embed_assets.sh
-    chmod +x scripts/find_input_devices.sh
-  '';
-
-  buildPhase = ''
-    runHook preBuild
-
-    # Ensure that the Makefile has the correct directory with the Wayland protocols
     export WAYLAND_PROTOCOLS_DIR="${wayland-protocols}/share/wayland-protocols"
-
-    # Compile with all optimizations (Longer compile time, improved performance)
-    make release
-
-    runHook postBuild
   '';
 
+  makeFlags = ["release"];
   installPhase = ''
     runHook preInstall
 
-    # Create directories
-    mkdir -p $out/bin
-    mkdir -p $out/share/bongocat
-    mkdir -p $out/share/doc/bongocat
-
     # Install binaries
-    cp build/bongocat $out/bin/
-    cp scripts/find_input_devices.sh $out/bin/bongocat-find-devices
-
-    # Install configuration example
-    cp bongocat.conf $out/share/bongocat/bongocat.conf.example
-
-    # Install documentation
-    cp README.md $out/share/doc/bongocat/
-    cp -r assets $out/share/doc/bongocat/
+    install -Dm755 build/bongocat $out/bin/${finalAttrs.meta.mainProgram}
+    install -Dm755 scripts/find_input_devices.sh $out/bin/bongocat-find-devices
 
     runHook postInstall
   '';
-}
+
+  # Package information
+  meta = {
+    description = "Delightful Wayland overlay that displays an animated bongo cat reacting to your keyboard input!";
+    homepage = "https://github.com/saatvik333/wayland-bongocat";
+    license = lib.licenses.mit;
+    maintainers = with lib.maintainers; [voxi0];
+    mainProgram = "bongocat";
+    platforms = lib.platforms.linux;
+  };
+})
