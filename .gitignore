@@ -1,51 +1,12 @@
-# Object files
-*.o
-*.ko
-*.obj
-*.elf
-obj/
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Libraries
-*.lib
-*.a
-*.la
-*.lo
-
-# Shared objects (inc. Windows DLLs)
-*.dll
-*.so
-*.so.*
-*.dylib
-
-# Executables
-*.exe
-*.out
-*.app
-*.i*86
-*.x86_64
-*.hex
-bongocat-v*
-bongocat
-!build/bongocat
+# Build output from both `make` and `nix build`
+build
+result
 
 # Debug files
 *.dSYM/
 *.su
 *.idb
 *.pdb
-
-# Kernel Module Compile Results
-*.mod*
-*.cmd
-.tmp_versions/
-modules.order
-Module.symvers
-Mkfile.old
-dkms.conf
 
 # Generated protocol files
 *-protocol.c
@@ -61,18 +22,6 @@ src/embedded_assets.c
 *.swp
 *.swo
 *~
-
-# Build artifacts
-build/
-dist/
-
-# Nix build results
-result
-result-*
-
-# Nix development
-.direnv/
-.envrc
 
 # Temporary files
 *.tmp

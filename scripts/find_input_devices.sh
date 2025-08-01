@@ -1,4 +1,3 @@
-#!/bin/bash
 # Wayland Bongo Cat - Input Device Discovery Tool
 # Professional input device finder with comprehensive analysis
 # Version: 1.2.0
