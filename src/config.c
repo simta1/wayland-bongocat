@@ -207,7 +207,7 @@ bongocat_error_t load_config(config_t *config, const char *config_file_path) {
     
     // Initialize with defaults
     *config = (config_t) {
-        .screen_width = get_screen_width(),
+        .screen_width = DEFAULT_SCREEN_WIDTH,  // Will be updated by Wayland detection
         .bar_height = DEFAULT_BAR_HEIGHT,
         .asset_paths = {
             "assets/bongo-cat-both-up.png",
@@ -286,22 +286,7 @@ void config_cleanup(void) {
 }
 
 int get_screen_width(void) {
-    FILE *fp = popen("hyprctl monitors active", "r");
-    if (!fp) {
-        return DEFAULT_SCREEN_WIDTH;
-    }
-
-    char buf[1000];
-    if (!fgets(buf, sizeof(buf), fp)) { // skip first line
-        pclose(fp);
-        return DEFAULT_SCREEN_WIDTH;
-    }
-    if (fgets(buf, sizeof(buf), fp)) {
-        pclose(fp);
-        strtok(buf, "x");
-        return atoi(buf);
-    }
-    
-    pclose(fp);
+    // This function is now only used for initial config loading
+    // The actual screen width detection happens in wayland_init
     return DEFAULT_SCREEN_WIDTH;
 }
