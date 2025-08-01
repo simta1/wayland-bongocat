@@ -17,42 +17,64 @@ static void capture_input_multiple(char **device_paths, int num_devices, int ena
     bongocat_log_debug("Starting input capture on %d devices", num_devices);
     
     int *fds = BONGOCAT_MALLOC(num_devices * sizeof(int));
-    if (!fds) {
+    char **unique_paths = BONGOCAT_MALLOC(num_devices * sizeof(char*));
+    if (!fds || !unique_paths) {
         bongocat_log_error("Failed to allocate memory for file descriptors");
         exit(1);
     }
     
     int max_fd = -1;
     int valid_devices = 0;
+    int unique_devices = 0;
     
-    // Open all devices
+    // First pass: deduplicate device paths
     for (int i = 0; i < num_devices; i++) {
+        bool is_duplicate = false;
+        for (int j = 0; j < unique_devices; j++) {
+            if (strcmp(device_paths[i], unique_paths[j]) == 0) {
+                is_duplicate = true;
+                break;
+            }
+        }
+        if (!is_duplicate) {
+            unique_paths[unique_devices] = device_paths[i];
+            unique_devices++;
+        }
+    }
+    
+    bongocat_log_debug("Deduplicated %d devices to %d unique devices", num_devices, unique_devices);
+    
+    // Open all unique devices
+    for (int i = 0; i < unique_devices; i++) {
         fds[i] = -1;
         
         // Validate device path exists and is readable
         struct stat st;
-        if (stat(device_paths[i], &st) != 0) {
-            bongocat_log_warning("Input device does not exist: %s", device_paths[i]);
+        if (stat(unique_paths[i], &st) != 0) {
+            bongocat_log_warning("Input device does not exist: %s", unique_paths[i]);
             continue;
         }
         
         if (!S_ISCHR(st.st_mode)) {
-            bongocat_log_warning("Input device is not a character device: %s", device_paths[i]);
+            bongocat_log_warning("Input device is not a character device: %s", unique_paths[i]);
             continue;
         }
         
-        fds[i] = open(device_paths[i], O_RDONLY | O_NONBLOCK);
+        fds[i] = open(unique_paths[i], O_RDONLY | O_NONBLOCK);
         if (fds[i] < 0) {
-            bongocat_log_warning("Failed to open %s: %s", device_paths[i], strerror(errno));
+            bongocat_log_warning("Failed to open %s: %s", unique_paths[i], strerror(errno));
             continue;
         }
         
-        bongocat_log_info("Input monitoring started on %s (fd=%d)", device_paths[i], fds[i]);
+        bongocat_log_info("Input monitoring started on %s (fd=%d)", unique_paths[i], fds[i]);
         if (fds[i] > max_fd) {
             max_fd = fds[i];
         }
         valid_devices++;
     }
+    
+    // Update num_devices to reflect unique devices for the rest of the function
+    num_devices = unique_devices;
     
     if (valid_devices == 0) {
         bongocat_log_error("No valid input devices found");
@@ -105,9 +127,9 @@ static void capture_input_multiple(char **device_paths, int num_devices, int ena
                 for (int i = 0; i < num_devices; i++) {
                     if (fds[i] < 0) { // Device was not available before
                         struct stat st;
-                        if (stat(device_paths[i], &st) == 0 && S_ISCHR(st.st_mode)) {
+                        if (stat(unique_paths[i], &st) == 0 && S_ISCHR(st.st_mode)) {
                             // Device is now available, try to open it
-                            int new_fd = open(device_paths[i], O_RDONLY | O_NONBLOCK);
+                            int new_fd = open(unique_paths[i], O_RDONLY | O_NONBLOCK);
                             if (new_fd >= 0) {
                                 fds[i] = new_fd;
                                 if (new_fd > max_fd) {
@@ -115,7 +137,7 @@ static void capture_input_multiple(char **device_paths, int num_devices, int ena
                                 }
                                 valid_devices++;
                                 found_new_device = true;
-                                bongocat_log_info("New input device detected and opened: %s (fd=%d)", device_paths[i], new_fd);
+                                bongocat_log_info("New input device detected and opened: %s (fd=%d)", unique_paths[i], new_fd);
                             }
                         }
                     }
@@ -140,7 +162,7 @@ static void capture_input_multiple(char **device_paths, int num_devices, int ena
                 rd = read(fds[i], ev, sizeof(ev));
                 if (rd < 0) {
                     if (errno == EAGAIN) continue;
-                    bongocat_log_warning("Read error on %s: %s", device_paths[i], strerror(errno));
+                    bongocat_log_warning("Read error on %s: %s", unique_paths[i], strerror(errno));
                     close(fds[i]);
                     fds[i] = -1;
                     valid_devices--;
@@ -148,7 +170,7 @@ static void capture_input_multiple(char **device_paths, int num_devices, int ena
                 }
                 
                 if (rd == 0) {
-                    bongocat_log_warning("EOF on input device %s", device_paths[i]);
+                    bongocat_log_warning("EOF on input device %s", unique_paths[i]);
                     close(fds[i]);
                     fds[i] = -1;
                     valid_devices--;
@@ -164,7 +186,7 @@ static void capture_input_multiple(char **device_paths, int num_devices, int ena
                         key_pressed = true;
                         if (enable_debug) {
                             bongocat_log_debug("Key event: device=%s, code=%d, time=%ld.%06ld", 
-                                             device_paths[i], ev[j].code, ev[j].time.tv_sec, ev[j].time.tv_usec);
+                                             unique_paths[i], ev[j].code, ev[j].time.tv_sec, ev[j].time.tv_usec);
                         }
                     }
                 }
@@ -191,6 +213,7 @@ static void capture_input_multiple(char **device_paths, int num_devices, int ena
     }
     
     BONGOCAT_SAFE_FREE(fds);
+    BONGOCAT_SAFE_FREE(unique_paths);
     bongocat_log_info("Input monitoring stopped");
 }
 

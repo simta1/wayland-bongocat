@@ -1,5 +1,3 @@
-#!/bin/bash
-
 echo "Testing bongocat toggle functionality..."
 echo
 

@@ -14,6 +14,7 @@ extern struct wl_compositor *compositor;
 extern struct wl_shm *shm;
 extern struct zwlr_layer_shell_v1 *layer_shell;
 extern struct xdg_wm_base *xdg_wm_base;
+extern struct wl_output *output;
 extern struct wl_surface *surface;
 extern struct wl_buffer *buffer;
 extern struct zwlr_layer_surface_v1 *layer_surface;
@@ -27,5 +28,6 @@ void wayland_cleanup(void);
 void wayland_update_config(config_t *config);
 void draw_bar(void);
 int create_shm(int size);
+int wayland_get_screen_width(void);
 
 #endif // WAYLAND_H

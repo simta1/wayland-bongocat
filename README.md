@@ -1,7 +1,7 @@
 # Bongo Cat Wayland Overlay
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-1.2.1-blue.svg)](https://github.com/saatvik333/wayland-bongocat/releases)
+[![Version](https://img.shields.io/badge/version-1.2.2-blue.svg)](https://github.com/saatvik333/wayland-bongocat/releases)
 
 A delightful Wayland overlay that displays an animated bongo cat reacting to your keyboard input! Perfect for streamers, content creators, or anyone who wants to add some fun to their desktop.
 
@@ -10,11 +10,11 @@ A delightful Wayland overlay that displays an animated bongo cat reacting to you
 ## ✨ Features
 
 - **🎯 Real-time Animation** - Bongo cat reacts instantly to keyboard input
-- **🔥 Hot-Reload Configuration** - Modify settings without restarting (v1.2.1)
-- **🔄 Dynamic Device Detection** - Automatically detects Bluetooth/USB keyboards (v1.2.1)
-- **⚡ Performance Optimized** - Adaptive monitoring and batch processing (v1.2.1)
-- **🖥️ Wayland Native** - Built specifically for Wayland compositors
-- **💾 Lightweight** - Minimal resource usage (~2MB RAM)
+- **🔥 Hot-Reload Configuration** - Modify settings without restarting (v1.2.0)
+- **🔄 Dynamic Device Detection** - Automatically detects Bluetooth/USB keyboards (v1.2.0)
+- **⚡ Performance Optimized** - Adaptive monitoring and batch processing (v1.2.0)
+- **🖥️ Screen Detection** - Automatic screen detection for all sizes and orientations (1.2.2)
+- **💾 Lightweight** - Minimal resource usage (~7MB RAM)
 - **🎛️ Multi-device Support** - Monitor multiple keyboards simultaneously
 - **🎨 Embedded Assets** - No external dependencies
 - **🏗️ Cross-platform** - Works on x86_64 and ARM64
@@ -149,15 +149,6 @@ keyboard_device=/dev/input/event20  # External/Bluetooth keyboard
 enable_debug=1                   # Show debug messages
 ```
 
-### Hot-Reload Features (v1.2.1)
-
-When running with `--watch-config`:
-
-- ✨ **Real-time updates** - Edit config file, see changes instantly
-- 🔄 **Dynamic devices** - Bluetooth keyboards auto-detected when connected
-- 🎛️ **Visual feedback** - Opacity, size, and position changes apply immediately
-- 🚫 **No restart needed** - Perfect for fine-tuning your setup
-
 ### Configuration Reference
 
 | Setting                   | Type    | Range             | Default             | Description                                   |
@@ -220,10 +211,6 @@ bongocat --toggle
 - wayland-protocols
 - wayland-scanner
 
-**Optional:**
-
-- hyprctl (for automatic screen detection on Hyprland)
-
 ### Build Process
 
 ```bash
@@ -256,7 +243,7 @@ The `bongocat-find-devices` tool provides professional input device analysis wit
 $ bongocat-find-devices
 
 ╔══════════════════════════════════════════════════════════════════╗
-║ Wayland Bongo Cat - Input Device Discovery v1.2.1                ║
+║ Wayland Bongo Cat - Input Device Discovery v1.2.0                ║
 ╚══════════════════════════════════════════════════════════════════╝
 
 [SCAN] Scanning for input devices...
@@ -317,11 +304,11 @@ bongocat-find-devices --help
 ### System Requirements
 
 - **CPU:** Any modern x86_64 or ARM64 processor
-- **RAM:** ~2MB runtime usage
-- **Storage:** ~1.2MB executable size
+- **RAM:** ~7MB runtime usage
+- **Storage:** ~0.4MB executable size
 - **Compositor:** Wayland with layer shell protocol support
 
-### Performance Metrics (v1.2.1)
+### Performance Metrics (v1.2.2)
 
 - **Input Latency:** <1ms with batch processing
 - **CPU Usage:** <1% on modern systems
@@ -330,7 +317,7 @@ bongocat-find-devices --help
 
 ### Tested Compositors
 
-- ✅ **Hyprland** - Full support with screen detection
+- ✅ **Hyprland** - Full support
 - ✅ **Sway** - Full support
 - ✅ **Wayfire** - Compatible
 - ⚠️ **KDE Wayland** - Limited layer shell support
@@ -424,13 +411,9 @@ wayland-bongocat/
 └── nix/               # NixOS integration
 ```
 
-### Key Features (v1.2.1)
+### Key Features (v1.2.2)
 
-- **Hot-reload system** using inotify file monitoring
-- **Dynamic device detection** with adaptive intervals
-- **Batch event processing** for improved performance
-- **Thread-safe configuration** management
-- **Optimized I/O** with larger buffers
+- **Screen Detection** -> Automatic screen width/orientation detection
 
 ## 🤝 Contributing
 
@@ -464,4 +447,4 @@ Built with ❤️ for the Wayland community. Special thanks to:
 
 ---
 
-**₍^. .^₎ Wayland Bongo Cat Overlay v1.2.1** - Making desktops more delightful, one keystroke at a time!
+**₍^. .^₎ Wayland Bongo Cat Overlay v1.2.2** - Making desktops more delightful, one keystroke at a time!

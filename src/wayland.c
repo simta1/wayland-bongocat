@@ -12,10 +12,20 @@ struct wl_compositor *compositor;
 struct wl_shm *shm;
 struct zwlr_layer_shell_v1 *layer_shell;
 struct xdg_wm_base *xdg_wm_base;
+struct wl_output *output;
 struct wl_surface *surface;
-struct wl_buffer *buffer;wlr-foreign-toplevel-management-v1 protocol
+struct wl_buffer *buffer;
 struct zwlr_layer_surface_v1 *layer_surface;
 uint8_t *pixels;
+
+// Screen dimensions from Wayland output
+static int wayland_screen_width = 0;
+static int wayland_screen_height = 0;
+static int wayland_transform = WL_OUTPUT_TRANSFORM_NORMAL;
+static int wayland_raw_width = 0;
+static int wayland_raw_height = 0;
+static bool wayland_mode_received = false;
+static bool wayland_geometry_received = false;
 
 static config_t *current_config;
 
@@ -170,6 +180,7 @@ static struct zwlr_layer_surface_v1_listener layer_listener = {
     .closed = NULL,
 };
 
+<<<<<<< HEAD
 // XDG shell handlers for fullscreen detection
 static void xdg_wm_base_ping(void *data __attribute__((unused)), struct xdg_wm_base *wm_base, uint32_t serial) {
     xdg_wm_base_pong(wm_base, serial);
@@ -177,6 +188,91 @@ static void xdg_wm_base_ping(void *data __attribute__((unused)), struct xdg_wm_b
 
 static struct xdg_wm_base_listener xdg_wm_base_listener = {
     .ping = xdg_wm_base_ping,
+=======
+static void calculate_effective_screen_dimensions(void) {
+    if (!wayland_mode_received || !wayland_geometry_received) {
+        return; // Wait for both mode and geometry
+    }
+    
+    // Only calculate and log if we haven't already done so
+    if (wayland_screen_width > 0) {
+        return; // Already calculated
+    }
+    
+    // Check if the display is rotated (90° or 270°)
+    // In these cases, width and height are swapped from the user's perspective
+    // WL_OUTPUT_TRANSFORM values:
+    // 0 = normal, 1 = 90°, 2 = 180°, 3 = 270°
+    // 4 = flipped, 5 = flipped+90°, 6 = flipped+180°, 7 = flipped+270°
+    bool is_rotated = (wayland_transform == WL_OUTPUT_TRANSFORM_90 ||
+                      wayland_transform == WL_OUTPUT_TRANSFORM_270 ||
+                      wayland_transform == WL_OUTPUT_TRANSFORM_FLIPPED_90 ||
+                      wayland_transform == WL_OUTPUT_TRANSFORM_FLIPPED_270);
+    
+    if (is_rotated) {
+        // For rotated displays, swap width and height to get the effective screen width
+        wayland_screen_width = wayland_raw_height;
+        wayland_screen_height = wayland_raw_width;
+        bongocat_log_info("Detected rotated screen dimensions: %dx%d (transform: %d)", 
+                         wayland_raw_height, wayland_raw_width, wayland_transform);
+    } else {
+        wayland_screen_width = wayland_raw_width;
+        wayland_screen_height = wayland_raw_height;
+        bongocat_log_info("Detected screen dimensions: %dx%d (transform: %d)", 
+                         wayland_raw_width, wayland_raw_height, wayland_transform);
+    }
+}
+
+static void output_geometry(void *data __attribute__((unused)),
+                           struct wl_output *wl_output __attribute__((unused)),
+                           int32_t x __attribute__((unused)),
+                           int32_t y __attribute__((unused)),
+                           int32_t physical_width __attribute__((unused)),
+                           int32_t physical_height __attribute__((unused)),
+                           int32_t subpixel __attribute__((unused)),
+                           const char *make __attribute__((unused)),
+                           const char *model __attribute__((unused)),
+                           int32_t transform) {
+    wayland_transform = transform;
+    wayland_geometry_received = true;
+    bongocat_log_debug("Output transform: %d", transform);
+    calculate_effective_screen_dimensions();
+}
+
+static void output_mode(void *data __attribute__((unused)),
+                       struct wl_output *wl_output __attribute__((unused)),
+                       uint32_t flags,
+                       int32_t width,
+                       int32_t height,
+                       int32_t refresh __attribute__((unused))) {
+    if (flags & WL_OUTPUT_MODE_CURRENT) {
+        wayland_raw_width = width;
+        wayland_raw_height = height;
+        wayland_mode_received = true;
+        bongocat_log_debug("Received raw screen mode: %dx%d", width, height);
+        calculate_effective_screen_dimensions();
+    }
+}
+
+static void output_done(void *data __attribute__((unused)),
+                       struct wl_output *wl_output __attribute__((unused))) {
+    // Output configuration is complete - ensure we have calculated dimensions
+    calculate_effective_screen_dimensions();
+    bongocat_log_debug("Output configuration complete");
+}
+
+static void output_scale(void *data __attribute__((unused)),
+                        struct wl_output *wl_output __attribute__((unused)),
+                        int32_t factor __attribute__((unused))) {
+    // We don't need scale info for screen width detection
+}
+
+static struct wl_output_listener output_listener = {
+    .geometry = output_geometry,
+    .mode = output_mode,
+    .done = output_done,
+    .scale = output_scale,
+>>>>>>> main
 };
 
 static void registry_global(void *data __attribute__((unused)), struct wl_registry *reg, uint32_t name,
@@ -187,10 +283,18 @@ static void registry_global(void *data __attribute__((unused)), struct wl_regist
         shm = (struct wl_shm *)wl_registry_bind(reg, name, &wl_shm_interface, 1);
     } else if (strcmp(iface, zwlr_layer_shell_v1_interface.name) == 0) {
         layer_shell = (struct zwlr_layer_shell_v1 *)wl_registry_bind(reg, name, &zwlr_layer_shell_v1_interface, 1);
+<<<<<<< HEAD
     } else if (strcmp(iface, xdg_wm_base_interface.name) == 0) {
         xdg_wm_base = (struct xdg_wm_base *)wl_registry_bind(reg, name, &xdg_wm_base_interface, 1);
         if (xdg_wm_base) {
             xdg_wm_base_add_listener(xdg_wm_base, &xdg_wm_base_listener, NULL);
+=======
+    } else if (strcmp(iface, wl_output_interface.name) == 0) {
+        // Bind to the first output we find
+        if (!output) {
+            output = (struct wl_output *)wl_registry_bind(reg, name, &wl_output_interface, 2);
+            wl_output_add_listener(output, &output_listener, NULL);
+>>>>>>> main
         }
     }
 }
@@ -238,6 +342,21 @@ bongocat_error_t wayland_init(config_t *config) {
         return BONGOCAT_ERROR_WAYLAND;
     }
     bongocat_log_debug("Got required Wayland protocols");
+
+    // Wait for output information if we have an output
+    if (output) {
+        wl_display_roundtrip(display);
+        if (wayland_screen_width > 0) {
+            bongocat_log_info("Detected screen width from Wayland: %d", wayland_screen_width);
+            config->screen_width = wayland_screen_width;
+        } else {
+            bongocat_log_warning("Failed to detect screen width from Wayland, using default: %d", DEFAULT_SCREEN_WIDTH);
+            config->screen_width = DEFAULT_SCREEN_WIDTH;
+        }
+    } else {
+        bongocat_log_warning("No Wayland output found, using default screen width: %d", DEFAULT_SCREEN_WIDTH);
+        config->screen_width = DEFAULT_SCREEN_WIDTH;
+    }
 
     surface = wl_compositor_create_surface(compositor);
     if (!surface) {
@@ -429,6 +548,10 @@ bongocat_error_t wayland_run(volatile sig_atomic_t *running) {
     return BONGOCAT_SUCCESS;
 }
 
+int wayland_get_screen_width(void) {
+    return wayland_screen_width;
+}
+
 void wayland_cleanup(void) {
     bongocat_log_info("Cleaning up Wayland resources");
 
@@ -454,6 +577,11 @@ void wayland_cleanup(void) {
     if (surface) {
         wl_surface_destroy(surface);
         surface = NULL;
+    }
+
+    if (output) {
+        wl_output_destroy(output);
+        output = NULL;
     }
 
     if (layer_shell) {
@@ -482,7 +610,17 @@ void wayland_cleanup(void) {
     }
 
     configured = false;
+<<<<<<< HEAD
     fullscreen_detected = false;
+=======
+    wayland_screen_width = 0;
+    wayland_screen_height = 0;
+    wayland_transform = WL_OUTPUT_TRANSFORM_NORMAL;
+    wayland_raw_width = 0;
+    wayland_raw_height = 0;
+    wayland_mode_received = false;
+    wayland_geometry_received = false;
+>>>>>>> main
     bongocat_log_debug("Wayland cleanup complete");
 }
 
