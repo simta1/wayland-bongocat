@@ -354,11 +354,11 @@ static void cli_show_help(const char *program_name) {
     printf("Bongo Cat Wayland Overlay\n");
     printf("Usage: %s [options]\n", program_name);
     printf("Options:\n");
-    printf("  -h, --help         Show this help message\n");
-    printf("  -v, --version      Show version information\n");
-    printf("  -c, --config       Specify config file (default: bongocat.conf)\n");
-    printf("  -w, --watch-config Watch config file for changes and reload automatically\n");
-    printf("  --toggle           Toggle bongocat on/off (start if not running, stop if running)\n");
+    printf("  -h, --help            Show this help message\n");
+    printf("  -v, --version         Show version information\n");
+    printf("  -c, --config          Specify config file (default: bongocat.conf)\n");
+    printf("  -w, --watch-config    Watch config file for changes and reload automatically\n");
+    printf("  -t, --toggle          Toggle bongocat on/off (start if not running, stop if running)\n");
     printf("\nConfiguration is loaded from bongocat.conf in the current directory.\n");
 }
 
@@ -392,7 +392,7 @@ static int cli_parse_arguments(int argc, char *argv[], cli_args_t *args) {
             }
         } else if (strcmp(argv[i], "--watch-config") == 0 || strcmp(argv[i], "-w") == 0) {
             args->watch_config = true;
-        } else if (strcmp(argv[i], "--toggle") == 0) {
+        } else if (strcmp(argv[i], "--toggle") == 0 || strcmp(argv[i], "-t") == 0) {
             args->toggle_mode = true;
         } else {
             bongocat_log_warning("Unknown argument: %s", argv[i]);

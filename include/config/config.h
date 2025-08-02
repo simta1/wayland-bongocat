@@ -31,7 +31,6 @@ typedef struct {
     int fps;
     int overlay_opacity;
     int enable_debug;
-    int hide_on_fullscreen;
     layer_type_t layer;
     overlay_position_t overlay_position;
 } config_t;

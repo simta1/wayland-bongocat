@@ -710,15 +710,6 @@ void wayland_cleanup(void) {
     bongocat_log_debug("Wayland cleanup complete");
 }
 
-// Legacy API compatibility (deprecated)
-void wayland_switch_to_overlay_layer(void) {
-    bongocat_log_info("Layer switching disabled - using opacity-based hiding");
-}
-
-void wayland_switch_to_top_layer(void) {
-    bongocat_log_info("Layer switching disabled - using opacity-based hiding");
-}
-
 const char* wayland_get_current_layer_name(void) {
     return "OVERLAY";
 }

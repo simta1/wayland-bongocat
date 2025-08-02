@@ -29,8 +29,6 @@ void wayland_update_config(config_t *config);
 void draw_bar(void);
 int create_shm(int size);
 int wayland_get_screen_width(void);
-void wayland_switch_to_overlay_layer(void);
-void wayland_switch_to_top_layer(void);
 const char* wayland_get_current_layer_name(void);
 
 #endif // WAYLAND_H

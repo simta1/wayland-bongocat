@@ -99,7 +99,6 @@ static bongocat_error_t config_validate(config_t *config) {
     
     // Normalize boolean values
     config->enable_debug = config->enable_debug ? 1 : 0;
-    config->hide_on_fullscreen = config->hide_on_fullscreen ? 1 : 0;
     
     return BONGOCAT_SUCCESS;
 }
@@ -187,8 +186,6 @@ static bongocat_error_t config_parse_integer_key(config_t *config, const char *k
         config->overlay_opacity = int_value;
     } else if (strcmp(key, "enable_debug") == 0) {
         config->enable_debug = int_value;
-    } else if (strcmp(key, "hide_on_fullscreen") == 0) {
-        config->hide_on_fullscreen = int_value;
     } else {
         return BONGOCAT_ERROR_INVALID_PARAM; // Unknown key
     }
@@ -327,7 +324,6 @@ static void config_set_defaults(config_t *config) {
         .fps = 60,
         .overlay_opacity = 150,
         .enable_debug = 1,
-        .hide_on_fullscreen = 1,
         .layer = LAYER_TOP,  // Default to TOP for broader compatibility
         .overlay_position = POSITION_TOP
     };
@@ -358,7 +354,6 @@ static void config_log_summary(const config_t *config) {
     bongocat_log_debug("  FPS: %d, Opacity: %d", config->fps, config->overlay_opacity);
     bongocat_log_debug("  Position: %s", config->overlay_position == POSITION_TOP ? "top" : "bottom");
     bongocat_log_debug("  Layer: %s", config->layer == LAYER_TOP ? "top" : "overlay");
-    bongocat_log_debug("  Hide on fullscreen: %s", config->hide_on_fullscreen ? "enabled" : "disabled");
 }
 
 // =============================================================================
