@@ -17,7 +17,6 @@ A delightful Wayland overlay that displays an animated bongo cat reacting to you
 - **🎮 Smart Fullscreen Detection** - Automatically hides during fullscreen applications (v1.2.3)
 - **💾 Lightweight** - Minimal resource usage (~7MB RAM)
 - **🎛️ Multi-device Support** - Monitor multiple keyboards simultaneously
-- **🎨 Custom Artwork** - Custom-drawn bongocat image files by [@Shreyabardia](https://github.com/Shreyabardia)
 - **🏗️ Cross-platform** - Works on x86_64 and ARM64
 
 ## 🚀 Installation
