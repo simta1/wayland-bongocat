@@ -1,9 +1,9 @@
 #ifndef ANIMATION_H
 #define ANIMATION_H
 
-#include "bongocat.h"
-#include "config.h"
-#include "error.h"
+#include "core/bongocat.h"
+#include "config/config.h"
+#include "utils/error.h"
 
 extern unsigned char *anim_imgs[NUM_FRAMES];
 extern int anim_width[NUM_FRAMES], anim_height[NUM_FRAMES];

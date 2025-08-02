@@ -14,8 +14,8 @@ result
 *-client-protocol.h
 
 # Generated embedded assets
-include/embedded_assets.h
-src/embedded_assets.c
+*embedded_assets.h
+*embedded_assets.c
 
 # IDE files
 .vscode/

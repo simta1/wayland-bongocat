@@ -1,8 +1,8 @@
 #define _POSIX_C_SOURCE 200809L
 #define _DEFAULT_SOURCE
-#include "input.h"
-#include "animation.h"
-#include "memory.h"
+#include "platform/input.h"
+#include "graphics/animation.h"
+#include "utils/memory.h"
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/types.h>
@@ -13,7 +13,21 @@
 int *any_key_pressed;
 static pid_t input_child_pid = -1;
 
+// Child process signal handler - exits quietly without logging
+static void child_signal_handler(int sig) {
+    (void)sig; // Suppress unused parameter warning
+    exit(0);
+}
+
 static void capture_input_multiple(char **device_paths, int num_devices, int enable_debug) {
+    // Set up child-specific signal handlers to avoid duplicate logging
+    struct sigaction sa;
+    sa.sa_handler = child_signal_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sigaction(SIGTERM, &sa, NULL);
+    sigaction(SIGINT, &sa, NULL);
+    
     bongocat_log_debug("Starting input capture on %d devices", num_devices);
     
     int *fds = BONGOCAT_MALLOC(num_devices * sizeof(int));
