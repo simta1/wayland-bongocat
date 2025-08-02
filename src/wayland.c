@@ -180,7 +180,6 @@ static struct zwlr_layer_surface_v1_listener layer_listener = {
     .closed = NULL,
 };
 
-<<<<<<< HEAD
 // XDG shell handlers for fullscreen detection
 static void xdg_wm_base_ping(void *data __attribute__((unused)), struct xdg_wm_base *wm_base, uint32_t serial) {
     xdg_wm_base_pong(wm_base, serial);
@@ -188,7 +187,8 @@ static void xdg_wm_base_ping(void *data __attribute__((unused)), struct xdg_wm_b
 
 static struct xdg_wm_base_listener xdg_wm_base_listener = {
     .ping = xdg_wm_base_ping,
-=======
+};
+
 static void calculate_effective_screen_dimensions(void) {
     if (!wayland_mode_received || !wayland_geometry_received) {
         return; // Wait for both mode and geometry
@@ -272,7 +272,6 @@ static struct wl_output_listener output_listener = {
     .mode = output_mode,
     .done = output_done,
     .scale = output_scale,
->>>>>>> main
 };
 
 static void registry_global(void *data __attribute__((unused)), struct wl_registry *reg, uint32_t name,
@@ -283,18 +282,16 @@ static void registry_global(void *data __attribute__((unused)), struct wl_regist
         shm = (struct wl_shm *)wl_registry_bind(reg, name, &wl_shm_interface, 1);
     } else if (strcmp(iface, zwlr_layer_shell_v1_interface.name) == 0) {
         layer_shell = (struct zwlr_layer_shell_v1 *)wl_registry_bind(reg, name, &zwlr_layer_shell_v1_interface, 1);
-<<<<<<< HEAD
     } else if (strcmp(iface, xdg_wm_base_interface.name) == 0) {
         xdg_wm_base = (struct xdg_wm_base *)wl_registry_bind(reg, name, &xdg_wm_base_interface, 1);
         if (xdg_wm_base) {
             xdg_wm_base_add_listener(xdg_wm_base, &xdg_wm_base_listener, NULL);
-=======
+        }
     } else if (strcmp(iface, wl_output_interface.name) == 0) {
         // Bind to the first output we find
         if (!output) {
             output = (struct wl_output *)wl_registry_bind(reg, name, &wl_output_interface, 2);
             wl_output_add_listener(output, &output_listener, NULL);
->>>>>>> main
         }
     }
 }
@@ -610,9 +607,7 @@ void wayland_cleanup(void) {
     }
 
     configured = false;
-<<<<<<< HEAD
     fullscreen_detected = false;
-=======
     wayland_screen_width = 0;
     wayland_screen_height = 0;
     wayland_transform = WL_OUTPUT_TRANSFORM_NORMAL;
@@ -620,7 +615,6 @@ void wayland_cleanup(void) {
     wayland_raw_height = 0;
     wayland_mode_received = false;
     wayland_geometry_received = false;
->>>>>>> main
     bongocat_log_debug("Wayland cleanup complete");
 }
 
