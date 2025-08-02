@@ -1,8 +1,8 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#include "bongocat.h"
-#include "error.h"
+#include "core/bongocat.h"
+#include "utils/error.h"
 
 typedef enum {
     POSITION_TOP = 0,

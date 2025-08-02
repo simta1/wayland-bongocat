@@ -1,12 +1,12 @@
 #define _POSIX_C_SOURCE 200809L
 #define _DEFAULT_SOURCE
-#include "bongocat.h"
-#include "wayland.h"
-#include "animation.h"
-#include "input.h"
-#include "config.h"
-#include "error.h"
-#include "memory.h"
+#include "core/bongocat.h"
+#include "platform/wayland.h"
+#include "graphics/animation.h"
+#include "platform/input.h"
+#include "config/config.h"
+#include "utils/error.h"
+#include "utils/memory.h"
 #include <signal.h>
 #include <sys/wait.h>
 #include <stdbool.h>

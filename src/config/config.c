@@ -1,7 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
-#include "config.h"
-#include "error.h"
-#include "memory.h"
+#include "config/config.h"
+#include "utils/error.h"
+#include "utils/memory.h"
 #include <limits.h>
 
 // =============================================================================

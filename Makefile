@@ -38,13 +38,13 @@ PROTOCOLDIR = protocols
 WAYLAND_PROTOCOLS_DIR ?= /usr/share/wayland-protocols
 
 # Source files (excluding embedded assets which is generated)
-SOURCES = $(filter-out $(EMBEDDED_ASSETS_C), $(wildcard $(SRCDIR)/*.c))
-OBJECTS = $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o) $(OBJDIR)/embedded_assets.o
+SOURCES = $(filter-out $(EMBEDDED_ASSETS_C), $(shell find $(SRCDIR) -name "*.c"))
+OBJECTS = $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o) $(OBJDIR)/graphics/embedded_assets.o
 
 # Embedded assets
 EMBED_SCRIPT = scripts/embed_assets.sh
-EMBEDDED_ASSETS_H = $(INCDIR)/embedded_assets.h
-EMBEDDED_ASSETS_C = $(SRCDIR)/embedded_assets.c
+EMBEDDED_ASSETS_H = $(INCDIR)/graphics/embedded_assets.h
+EMBEDDED_ASSETS_C = $(SRCDIR)/graphics/embedded_assets.c
 
 # Protocol files
 C_PROTOCOL_SRC = $(PROTOCOLDIR)/zwlr-layer-shell-v1-protocol.c $(PROTOCOLDIR)/xdg-shell-protocol.c $(PROTOCOLDIR)/wlr-foreign-toplevel-management-v1-protocol.c
@@ -70,6 +70,11 @@ $(EMBEDDED_ASSETS_H) $(EMBEDDED_ASSETS_C): $(EMBED_SCRIPT) assets/*.png
 # Create build directories
 $(OBJDIR):
 	mkdir -p $(OBJDIR)
+	mkdir -p $(OBJDIR)/core
+	mkdir -p $(OBJDIR)/graphics
+	mkdir -p $(OBJDIR)/platform
+	mkdir -p $(OBJDIR)/config
+	mkdir -p $(OBJDIR)/utils
 	mkdir -p $(BUILDDIR)
 
 # Compile source files (depends on protocol headers and embedded assets)

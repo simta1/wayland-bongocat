@@ -1,9 +1,9 @@
 #ifndef WAYLAND_H
 #define WAYLAND_H
 
-#include "bongocat.h"
-#include "config.h"
-#include "error.h"
+#include "core/bongocat.h"
+#include "config/config.h"
+#include "utils/error.h"
 #include <signal.h>
 #include "../protocols/zwlr-layer-shell-v1-client-protocol.h"
 #include "../protocols/xdg-shell-client-protocol.h"

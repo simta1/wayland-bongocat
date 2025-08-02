@@ -1,6 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
-#include "wayland.h"
-#include "animation.h"
+#include "platform/wayland.h"
+#include "graphics/animation.h"
 #include <poll.h>
 #include <sys/time.h>
 #include "../protocols/wlr-foreign-toplevel-management-v1-client-protocol.h"
