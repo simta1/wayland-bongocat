@@ -5,6 +5,10 @@
 #include <sys/time.h>
 #include "../protocols/wlr-foreign-toplevel-management-v1-client-protocol.h"
 
+// =============================================================================
+// GLOBAL STATE AND CONFIGURATION
+// =============================================================================
+
 // Wayland globals
 bool configured = false;
 bool fullscreen_detected = false;
@@ -13,51 +17,117 @@ struct wl_compositor *compositor;
 struct wl_shm *shm;
 struct zwlr_layer_shell_v1 *layer_shell;
 struct xdg_wm_base *xdg_wm_base;
-struct zwlr_foreign_toplevel_manager_v1 *foreign_toplevel_manager;
 struct wl_output *output;
 struct wl_surface *surface;
 struct wl_buffer *buffer;
 struct zwlr_layer_surface_v1 *layer_surface;
 uint8_t *pixels;
 
-// Screen dimensions from Wayland output
-static int wayland_screen_width = 0;
-static int wayland_screen_height = 0;
-static int wayland_transform = WL_OUTPUT_TRANSFORM_NORMAL;
-static int wayland_raw_width = 0;
-static int wayland_raw_height = 0;
-static bool wayland_mode_received = false;
-static bool wayland_geometry_received = false;
-
 static config_t *current_config;
 
-// Foreign toplevel management
-static bool has_fullscreen_toplevel = false;
+// =============================================================================
+// SCREEN DIMENSION MANAGEMENT
+// =============================================================================
 
-// Note: We use opacity-based hiding instead of layer switching for better compatibility
+typedef struct {
+    int screen_width;
+    int screen_height;
+    int transform;
+    int raw_width;
+    int raw_height;
+    bool mode_received;
+    bool geometry_received;
+} screen_info_t;
 
-// Foreign toplevel handle event handlers
-static void foreign_toplevel_handle_title(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, const char *title) {
-    (void)data; (void)handle; (void)title;
-    // We don't need to track titles for fullscreen detection
+static screen_info_t screen_info = {0};
+
+// =============================================================================
+// FULLSCREEN DETECTION MODULE
+// =============================================================================
+
+typedef struct {
+    struct zwlr_foreign_toplevel_manager_v1 *manager;
+    bool has_fullscreen_toplevel;
+    struct timeval last_check;
+} fullscreen_detector_t;
+
+static fullscreen_detector_t fs_detector = {0};
+
+// =============================================================================
+// FULLSCREEN DETECTION IMPLEMENTATION
+// =============================================================================
+
+static void fs_update_state(bool new_state) {
+    if (new_state != fs_detector.has_fullscreen_toplevel) {
+        fs_detector.has_fullscreen_toplevel = new_state;
+        fullscreen_detected = new_state;
+        
+        bongocat_log_info("Fullscreen state changed: %s", 
+                         fullscreen_detected ? "detected" : "cleared");
+        
+        if (configured) {
+            draw_bar();
+        }
+    }
 }
 
-static void foreign_toplevel_handle_app_id(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, const char *app_id) {
-    (void)data; (void)handle; (void)app_id;
-    // We don't need to track app IDs for fullscreen detection
+static bool fs_check_compositor_fallback(void) {
+    bongocat_log_debug("Using compositor-specific fullscreen detection");
+    
+    // Try Hyprland first
+    FILE *fp = popen("hyprctl activewindow 2>/dev/null", "r");
+    if (fp) {
+        char line[512];
+        bool is_fullscreen = false;
+        
+        while (fgets(line, sizeof(line), fp)) {
+            size_t len = strlen(line);
+            if (len > 0 && line[len-1] == '\n') {
+                line[len-1] = '\0';
+            }
+            
+            if (strstr(line, "fullscreen: 1") || strstr(line, "fullscreen: 2") || 
+                strstr(line, "fullscreen: true")) {
+                is_fullscreen = true;
+                bongocat_log_debug("Fullscreen detected in Hyprland");
+                break;
+            }
+        }
+        pclose(fp);
+        return is_fullscreen;
+    }
+    
+    // Try Sway as fallback
+    fp = popen("swaymsg -t get_tree 2>/dev/null", "r");
+    if (fp) {
+        char buffer[4096];
+        bool is_fullscreen = false;
+        
+        while (fgets(buffer, sizeof(buffer), fp)) {
+            if (strstr(buffer, "\"fullscreen_mode\":1")) {
+                is_fullscreen = true;
+                bongocat_log_debug("Fullscreen detected in Sway");
+                break;
+            }
+        }
+        pclose(fp);
+        return is_fullscreen;
+    }
+    
+    bongocat_log_debug("No supported compositor found for fullscreen detection");
+    return false;
 }
 
-static void foreign_toplevel_handle_output_enter(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, struct wl_output *output) {
-    (void)data; (void)handle; (void)output;
-    // We don't need to track output changes
+static bool fs_check_status(void) {
+    if (fs_detector.manager) {
+        return fs_detector.has_fullscreen_toplevel;
+    }
+    return fs_check_compositor_fallback();
 }
 
-static void foreign_toplevel_handle_output_leave(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, struct wl_output *output) {
-    (void)data; (void)handle; (void)output;
-    // We don't need to track output changes
-}
-
-static void foreign_toplevel_handle_state(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, struct wl_array *state) {
+// Foreign toplevel protocol event handlers
+static void fs_handle_toplevel_state(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, 
+                                     struct wl_array *state) {
     (void)data; (void)handle;
     
     bool is_fullscreen = false;
@@ -70,127 +140,78 @@ static void foreign_toplevel_handle_state(void *data, struct zwlr_foreign_toplev
         }
     }
     
-    // Update global fullscreen state
-    bool old_state = has_fullscreen_toplevel;
-    has_fullscreen_toplevel = is_fullscreen;
-    
-    if (old_state != has_fullscreen_toplevel) {
-        bongocat_log_info("Fullscreen state changed via Wayland protocol: %s", 
-                         has_fullscreen_toplevel ? "detected" : "cleared");
-        
-        // Update the global fullscreen_detected for compatibility
-        fullscreen_detected = has_fullscreen_toplevel;
-        
-        // Trigger redraw with new opacity
-        if (configured) {
-            draw_bar();
-        }
-    }
+    fs_update_state(is_fullscreen);
 }
 
-static void foreign_toplevel_handle_done(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle) {
-    (void)data; (void)handle;
-    // State updates are complete
-}
-
-static void foreign_toplevel_handle_closed(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle) {
+static void fs_handle_toplevel_closed(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle) {
     (void)data;
     zwlr_foreign_toplevel_handle_v1_destroy(handle);
 }
 
-static void foreign_toplevel_handle_parent(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, struct zwlr_foreign_toplevel_handle_v1 *parent) {
-    (void)data; (void)handle; (void)parent;
-    // We don't need to track parent relationships
-}
+// Minimal event handlers for unused events
+static void fs_handle_unused(void) { /* Unused events */ }
 
-static const struct zwlr_foreign_toplevel_handle_v1_listener foreign_toplevel_handle_listener = {
-    .title = foreign_toplevel_handle_title,
-    .app_id = foreign_toplevel_handle_app_id,
-    .output_enter = foreign_toplevel_handle_output_enter,
-    .output_leave = foreign_toplevel_handle_output_leave,
-    .state = foreign_toplevel_handle_state,
-    .done = foreign_toplevel_handle_done,
-    .closed = foreign_toplevel_handle_closed,
-    .parent = foreign_toplevel_handle_parent,
+static const struct zwlr_foreign_toplevel_handle_v1_listener fs_toplevel_listener = {
+    .title = (void*)fs_handle_unused,
+    .app_id = (void*)fs_handle_unused,
+    .output_enter = (void*)fs_handle_unused,
+    .output_leave = (void*)fs_handle_unused,
+    .state = fs_handle_toplevel_state,
+    .done = (void*)fs_handle_unused,
+    .closed = fs_handle_toplevel_closed,
+    .parent = (void*)fs_handle_unused,
 };
 
-// Foreign toplevel manager event handlers
-static void foreign_toplevel_manager_handle_toplevel(void *data, struct zwlr_foreign_toplevel_manager_v1 *manager, struct zwlr_foreign_toplevel_handle_v1 *toplevel) {
+static void fs_handle_manager_toplevel(void *data, struct zwlr_foreign_toplevel_manager_v1 *manager, 
+                                      struct zwlr_foreign_toplevel_handle_v1 *toplevel) {
     (void)data; (void)manager;
     
-    zwlr_foreign_toplevel_handle_v1_add_listener(toplevel, &foreign_toplevel_handle_listener, NULL);
+    zwlr_foreign_toplevel_handle_v1_add_listener(toplevel, &fs_toplevel_listener, NULL);
     bongocat_log_debug("New toplevel registered for fullscreen monitoring");
 }
 
-static void foreign_toplevel_manager_handle_finished(void *data, struct zwlr_foreign_toplevel_manager_v1 *manager) {
+static void fs_handle_manager_finished(void *data, struct zwlr_foreign_toplevel_manager_v1 *manager) {
     (void)data;
     bongocat_log_info("Foreign toplevel manager finished");
     zwlr_foreign_toplevel_manager_v1_destroy(manager);
-    foreign_toplevel_manager = NULL;
+    fs_detector.manager = NULL;
 }
 
-static const struct zwlr_foreign_toplevel_manager_v1_listener foreign_toplevel_manager_listener = {
-    .toplevel = foreign_toplevel_manager_handle_toplevel,
-    .finished = foreign_toplevel_manager_handle_finished,
+static const struct zwlr_foreign_toplevel_manager_v1_listener fs_manager_listener = {
+    .toplevel = fs_handle_manager_toplevel,
+    .finished = fs_handle_manager_finished,
 };
 
-// Function to check if any window is fullscreen
-static bool check_fullscreen_status(void) {
-    // If we have foreign toplevel manager, use the protocol-based detection
-    if (foreign_toplevel_manager) {
-        // The fullscreen state is updated via protocol events in real-time
-        // No need to poll - just return the current state
-        return has_fullscreen_toplevel;
+// =============================================================================
+// SCREEN DIMENSION MANAGEMENT
+// =============================================================================
+
+static void screen_calculate_dimensions(void) {
+    if (!screen_info.mode_received || !screen_info.geometry_received || screen_info.screen_width > 0) {
+        return;
     }
     
-    // Fallback to compositor-specific detection for compositors without the protocol
-    bongocat_log_debug("Using compositor-specific fullscreen detection (no foreign toplevel protocol)");
+    bool is_rotated = (screen_info.transform == WL_OUTPUT_TRANSFORM_90 ||
+                      screen_info.transform == WL_OUTPUT_TRANSFORM_270 ||
+                      screen_info.transform == WL_OUTPUT_TRANSFORM_FLIPPED_90 ||
+                      screen_info.transform == WL_OUTPUT_TRANSFORM_FLIPPED_270);
     
-    // Try Hyprland first
-    FILE *fp = popen("hyprctl activewindow 2>/dev/null", "r");
-    if (fp) {
-        char line[512];
-        bool is_fullscreen = false;
-        
-        while (fgets(line, sizeof(line), fp)) {
-            // Remove newline for cleaner logging
-            size_t len = strlen(line);
-            if (len > 0 && line[len-1] == '\n') {
-                line[len-1] = '\0';
-            }
-            
-            // Check for any fullscreen mode (1 = real fullscreen, 2 = fake fullscreen)
-            if (strstr(line, "fullscreen: 1") || strstr(line, "fullscreen: 2") || strstr(line, "fullscreen: true")) {
-                is_fullscreen = true;
-                bongocat_log_debug("Fullscreen detected in Hyprland");
-                break;
-            }
-        }
-        pclose(fp);
-        return is_fullscreen;
+    if (is_rotated) {
+        screen_info.screen_width = screen_info.raw_height;
+        screen_info.screen_height = screen_info.raw_width;
+        bongocat_log_info("Detected rotated screen: %dx%d (transform: %d)", 
+                         screen_info.raw_height, screen_info.raw_width, screen_info.transform);
+    } else {
+        screen_info.screen_width = screen_info.raw_width;
+        screen_info.screen_height = screen_info.raw_height;
+        bongocat_log_info("Detected screen: %dx%d (transform: %d)", 
+                         screen_info.raw_width, screen_info.raw_height, screen_info.transform);
     }
-    
-    // Try sway as fallback
-    fp = popen("swaymsg -t get_tree 2>/dev/null", "r");
-    if (fp) {
-        char sway_buffer[4096];
-        bool is_fullscreen = false;
-        
-        while (fgets(sway_buffer, sizeof(sway_buffer), fp)) {
-            if (strstr(sway_buffer, "\"fullscreen_mode\":1")) {
-                is_fullscreen = true;
-                bongocat_log_debug("Fullscreen detected in Sway");
-                break;
-            }
-        }
-        pclose(fp);
-        return is_fullscreen;
-    }
-    
-    // If no compositor detection works, assume not fullscreen
-    bongocat_log_debug("No supported compositor found for fullscreen detection");
-    return false;
 }
+
+// =============================================================================
+// BUFFER AND DRAWING MANAGEMENT
+// =============================================================================
 
 int create_shm(int size) {
     char name[] = "/bar-shm-XXXXXX";
@@ -221,23 +242,21 @@ void draw_bar(void) {
         return;
     }
 
-    // Determine effective opacity based on fullscreen state
     int effective_opacity = fullscreen_detected ? 0 : current_config->overlay_opacity;
     
-    // Clear entire buffer with effective transparency
+    // Clear buffer with transparency
     for (int i = 0; i < current_config->screen_width * current_config->bar_height * 4; i += 4) {
         pixels[i] = 0;       // B
         pixels[i + 1] = 0;   // G
         pixels[i + 2] = 0;   // R
-        pixels[i + 3] = effective_opacity; // A (0 when fullscreen, normal opacity otherwise)
+        pixels[i + 3] = effective_opacity; // A
     }
 
-    // Only draw the cat if not in fullscreen mode
+    // Draw cat if visible
     if (!fullscreen_detected) {
         pthread_mutex_lock(&anim_lock);
-        // Use configured cat height
         int cat_height = current_config->cat_height;
-        int cat_width = (cat_height * 779) / 320;  // Maintain 954:393 ratio
+        int cat_width = (cat_height * 779) / 320;
         int cat_x = (current_config->screen_width - cat_width) / 2 + current_config->cat_x_offset;
         int cat_y = (current_config->bar_height - cat_height) / 2 + current_config->cat_y_offset;
 
@@ -256,6 +275,10 @@ void draw_bar(void) {
     wl_display_flush(display);
 }
 
+// =============================================================================
+// WAYLAND EVENT HANDLERS
+// =============================================================================
+
 static void layer_surface_configure(void *data __attribute__((unused)),
                                    struct zwlr_layer_surface_v1 *ls,
                                    uint32_t serial, uint32_t w, uint32_t h) {
@@ -270,48 +293,14 @@ static struct zwlr_layer_surface_v1_listener layer_listener = {
     .closed = NULL,
 };
 
-// XDG shell handlers for fullscreen detection
-static void xdg_wm_base_ping(void *data __attribute__((unused)), struct xdg_wm_base *wm_base, uint32_t serial) {
+static void xdg_wm_base_ping(void *data __attribute__((unused)), 
+                            struct xdg_wm_base *wm_base, uint32_t serial) {
     xdg_wm_base_pong(wm_base, serial);
 }
 
 static struct xdg_wm_base_listener xdg_wm_base_listener = {
     .ping = xdg_wm_base_ping,
 };
-
-static void calculate_effective_screen_dimensions(void) {
-    if (!wayland_mode_received || !wayland_geometry_received) {
-        return; // Wait for both mode and geometry
-    }
-    
-    // Only calculate and log if we haven't already done so
-    if (wayland_screen_width > 0) {
-        return; // Already calculated
-    }
-    
-    // Check if the display is rotated (90° or 270°)
-    // In these cases, width and height are swapped from the user's perspective
-    // WL_OUTPUT_TRANSFORM values:
-    // 0 = normal, 1 = 90°, 2 = 180°, 3 = 270°
-    // 4 = flipped, 5 = flipped+90°, 6 = flipped+180°, 7 = flipped+270°
-    bool is_rotated = (wayland_transform == WL_OUTPUT_TRANSFORM_90 ||
-                      wayland_transform == WL_OUTPUT_TRANSFORM_270 ||
-                      wayland_transform == WL_OUTPUT_TRANSFORM_FLIPPED_90 ||
-                      wayland_transform == WL_OUTPUT_TRANSFORM_FLIPPED_270);
-    
-    if (is_rotated) {
-        // For rotated displays, swap width and height to get the effective screen width
-        wayland_screen_width = wayland_raw_height;
-        wayland_screen_height = wayland_raw_width;
-        bongocat_log_info("Detected rotated screen dimensions: %dx%d (transform: %d)", 
-                         wayland_raw_height, wayland_raw_width, wayland_transform);
-    } else {
-        wayland_screen_width = wayland_raw_width;
-        wayland_screen_height = wayland_raw_height;
-        bongocat_log_info("Detected screen dimensions: %dx%d (transform: %d)", 
-                         wayland_raw_width, wayland_raw_height, wayland_transform);
-    }
-}
 
 static void output_geometry(void *data __attribute__((unused)),
                            struct wl_output *wl_output __attribute__((unused)),
@@ -323,38 +312,35 @@ static void output_geometry(void *data __attribute__((unused)),
                            const char *make __attribute__((unused)),
                            const char *model __attribute__((unused)),
                            int32_t transform) {
-    wayland_transform = transform;
-    wayland_geometry_received = true;
+    screen_info.transform = transform;
+    screen_info.geometry_received = true;
     bongocat_log_debug("Output transform: %d", transform);
-    calculate_effective_screen_dimensions();
+    screen_calculate_dimensions();
 }
 
 static void output_mode(void *data __attribute__((unused)),
                        struct wl_output *wl_output __attribute__((unused)),
-                       uint32_t flags,
-                       int32_t width,
-                       int32_t height,
+                       uint32_t flags, int32_t width, int32_t height,
                        int32_t refresh __attribute__((unused))) {
     if (flags & WL_OUTPUT_MODE_CURRENT) {
-        wayland_raw_width = width;
-        wayland_raw_height = height;
-        wayland_mode_received = true;
+        screen_info.raw_width = width;
+        screen_info.raw_height = height;
+        screen_info.mode_received = true;
         bongocat_log_debug("Received raw screen mode: %dx%d", width, height);
-        calculate_effective_screen_dimensions();
+        screen_calculate_dimensions();
     }
 }
 
 static void output_done(void *data __attribute__((unused)),
                        struct wl_output *wl_output __attribute__((unused))) {
-    // Output configuration is complete - ensure we have calculated dimensions
-    calculate_effective_screen_dimensions();
+    screen_calculate_dimensions();
     bongocat_log_debug("Output configuration complete");
 }
 
 static void output_scale(void *data __attribute__((unused)),
                         struct wl_output *wl_output __attribute__((unused)),
                         int32_t factor __attribute__((unused))) {
-    // We don't need scale info for screen width detection
+    // Scale not needed for our use case
 }
 
 static struct wl_output_listener output_listener = {
@@ -364,8 +350,12 @@ static struct wl_output_listener output_listener = {
     .scale = output_scale,
 };
 
-static void registry_global(void *data __attribute__((unused)), struct wl_registry *reg, uint32_t name,
-                           const char *iface, uint32_t ver __attribute__((unused))) {
+// =============================================================================
+// WAYLAND PROTOCOL REGISTRY
+// =============================================================================
+
+static void registry_global(void *data __attribute__((unused)), struct wl_registry *reg, 
+                           uint32_t name, const char *iface, uint32_t ver __attribute__((unused))) {
     if (strcmp(iface, wl_compositor_interface.name) == 0) {
         compositor = (struct wl_compositor *)wl_registry_bind(reg, name, &wl_compositor_interface, 4);
     } else if (strcmp(iface, wl_shm_interface.name) == 0) {
@@ -378,15 +368,15 @@ static void registry_global(void *data __attribute__((unused)), struct wl_regist
             xdg_wm_base_add_listener(xdg_wm_base, &xdg_wm_base_listener, NULL);
         }
     } else if (strcmp(iface, wl_output_interface.name) == 0) {
-        // Bind to the first output we find
         if (!output) {
             output = (struct wl_output *)wl_registry_bind(reg, name, &wl_output_interface, 2);
             wl_output_add_listener(output, &output_listener, NULL);
         }
     } else if (strcmp(iface, zwlr_foreign_toplevel_manager_v1_interface.name) == 0) {
-        foreign_toplevel_manager = (struct zwlr_foreign_toplevel_manager_v1 *)wl_registry_bind(reg, name, &zwlr_foreign_toplevel_manager_v1_interface, 3);
-        if (foreign_toplevel_manager) {
-            zwlr_foreign_toplevel_manager_v1_add_listener(foreign_toplevel_manager, &foreign_toplevel_manager_listener, NULL);
+        fs_detector.manager = (struct zwlr_foreign_toplevel_manager_v1 *)
+            wl_registry_bind(reg, name, &zwlr_foreign_toplevel_manager_v1_interface, 3);
+        if (fs_detector.manager) {
+            zwlr_foreign_toplevel_manager_v1_add_listener(fs_detector.manager, &fs_manager_listener, NULL);
             bongocat_log_info("Foreign toplevel manager bound - using Wayland protocol for fullscreen detection");
         }
     }
@@ -401,25 +391,14 @@ static struct wl_registry_listener reg_listener = {
     .global_remove = registry_remove
 };
 
-bongocat_error_t wayland_init(config_t *config) {
-    BONGOCAT_CHECK_NULL(config, BONGOCAT_ERROR_INVALID_PARAM);
+// =============================================================================
+// MAIN WAYLAND INTERFACE IMPLEMENTATION
+// =============================================================================
 
-    current_config = config;
-
-    bongocat_log_info("Initializing Wayland connection");
-
-    display = wl_display_connect(NULL);
-    if (!display) {
-        bongocat_log_error("Failed to connect to Wayland display");
-        return BONGOCAT_ERROR_WAYLAND;
-    }
-    bongocat_log_debug("Connected to Wayland display");
-
+static bongocat_error_t wayland_setup_protocols(void) {
     struct wl_registry *registry = wl_display_get_registry(display);
     if (!registry) {
         bongocat_log_error("Failed to get Wayland registry");
-        wl_display_disconnect(display);
-        display = NULL;
         return BONGOCAT_ERROR_WAYLAND;
     }
 
@@ -427,89 +406,73 @@ bongocat_error_t wayland_init(config_t *config) {
     wl_display_roundtrip(display);
 
     if (!compositor || !shm || !layer_shell) {
-        bongocat_log_error("Missing required Wayland protocols (compositor=%p, shm=%p, layer_shell=%p)",
-                          (void*)compositor, (void*)shm, (void*)layer_shell);
+        bongocat_log_error("Missing required Wayland protocols");
         wl_registry_destroy(registry);
-        wl_display_disconnect(display);
-        display = NULL;
         return BONGOCAT_ERROR_WAYLAND;
     }
-    bongocat_log_debug("Got required Wayland protocols");
 
-    // Wait for output information if we have an output
+    // Configure screen dimensions
     if (output) {
         wl_display_roundtrip(display);
-        if (wayland_screen_width > 0) {
-            bongocat_log_info("Detected screen width from Wayland: %d", wayland_screen_width);
-            config->screen_width = wayland_screen_width;
+        if (screen_info.screen_width > 0) {
+            bongocat_log_info("Detected screen width: %d", screen_info.screen_width);
+            current_config->screen_width = screen_info.screen_width;
         } else {
-            bongocat_log_warning("Failed to detect screen width from Wayland, using default: %d", DEFAULT_SCREEN_WIDTH);
-            config->screen_width = DEFAULT_SCREEN_WIDTH;
+            bongocat_log_warning("Using default screen width: %d", DEFAULT_SCREEN_WIDTH);
+            current_config->screen_width = DEFAULT_SCREEN_WIDTH;
         }
     } else {
-        bongocat_log_warning("No Wayland output found, using default screen width: %d", DEFAULT_SCREEN_WIDTH);
-        config->screen_width = DEFAULT_SCREEN_WIDTH;
+        bongocat_log_warning("No output found, using default screen width: %d", DEFAULT_SCREEN_WIDTH);
+        current_config->screen_width = DEFAULT_SCREEN_WIDTH;
     }
 
+    wl_registry_destroy(registry);
+    return BONGOCAT_SUCCESS;
+}
+
+static bongocat_error_t wayland_setup_surface(void) {
     surface = wl_compositor_create_surface(compositor);
     if (!surface) {
-        bongocat_log_error("Failed to create Wayland surface");
-        wl_registry_destroy(registry);
-        wl_display_disconnect(display);
-        display = NULL;
+        bongocat_log_error("Failed to create surface");
         return BONGOCAT_ERROR_WAYLAND;
     }
 
-    // Always use OVERLAY layer (we'll hide via opacity instead of switching layers)
     layer_surface = zwlr_layer_shell_v1_get_layer_surface(layer_shell, surface, NULL,
-                                                          ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY, "bongocat-overlay");
-    
-    bongocat_log_info("Using OVERLAY layer (will hide via opacity when fullscreen detected)");
+                                                          ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY, 
+                                                          "bongocat-overlay");
     if (!layer_surface) {
         bongocat_log_error("Failed to create layer surface");
-        wl_surface_destroy(surface);
-        surface = NULL;
-        wl_registry_destroy(registry);
-        wl_display_disconnect(display);
-        display = NULL;
         return BONGOCAT_ERROR_WAYLAND;
     }
 
-    // Set anchor based on configured position
+    // Configure layer surface
     uint32_t anchor = ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT | ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT;
-    if (config->overlay_position == POSITION_TOP) {
+    if (current_config->overlay_position == POSITION_TOP) {
         anchor |= ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP;
-        bongocat_log_debug("Setting overlay position to top");
     } else {
         anchor |= ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM;
-        bongocat_log_debug("Setting overlay position to bottom");
     }
+    
     zwlr_layer_surface_v1_set_anchor(layer_surface, anchor);
-    zwlr_layer_surface_v1_set_size(layer_surface, 0, config->bar_height);
+    zwlr_layer_surface_v1_set_size(layer_surface, 0, current_config->bar_height);
     zwlr_layer_surface_v1_set_exclusive_zone(layer_surface, -1);
-    zwlr_layer_surface_v1_set_margin(layer_surface, 0, 0, 0, 0);
-
-    // Make the overlay click-through by setting keyboard interactivity to none
     zwlr_layer_surface_v1_set_keyboard_interactivity(layer_surface,
                                                      ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE);
-
     zwlr_layer_surface_v1_add_listener(layer_surface, &layer_listener, NULL);
 
-    // Create an empty input region to make the surface click-through
+    // Make surface click-through
     struct wl_region *input_region = wl_compositor_create_region(compositor);
     if (input_region) {
-        // Don't add any rectangles to the region, keeping it empty
         wl_surface_set_input_region(surface, input_region);
         wl_region_destroy(input_region);
-        bongocat_log_debug("Set empty input region for click-through functionality");
-    } else {
-        bongocat_log_warning("Failed to create input region for click-through");
     }
 
     wl_surface_commit(surface);
+    return BONGOCAT_SUCCESS;
+}
 
-    // Create shared memory buffer
-    int size = config->screen_width * config->bar_height * 4;
+static bongocat_error_t wayland_setup_buffer(void) {
+    int size = current_config->screen_width * current_config->bar_height * 4;
     if (size <= 0) {
         bongocat_log_error("Invalid buffer size: %d", size);
         return BONGOCAT_ERROR_WAYLAND;
@@ -517,7 +480,6 @@ bongocat_error_t wayland_init(config_t *config) {
 
     int fd = create_shm(size);
     if (fd < 0) {
-        bongocat_log_error("Failed to create shared memory");
         return BONGOCAT_ERROR_WAYLAND;
     }
 
@@ -537,8 +499,10 @@ bongocat_error_t wayland_init(config_t *config) {
         return BONGOCAT_ERROR_WAYLAND;
     }
 
-    buffer = wl_shm_pool_create_buffer(pool, 0, config->screen_width, config->bar_height,
-                                      config->screen_width * 4, WL_SHM_FORMAT_ARGB8888);
+    buffer = wl_shm_pool_create_buffer(pool, 0, current_config->screen_width, 
+                                      current_config->bar_height,
+                                      current_config->screen_width * 4, 
+                                      WL_SHM_FORMAT_ARGB8888);
     if (!buffer) {
         bongocat_log_error("Failed to create buffer");
         wl_shm_pool_destroy(pool);
@@ -550,10 +514,31 @@ bongocat_error_t wayland_init(config_t *config) {
 
     wl_shm_pool_destroy(pool);
     close(fd);
-    wl_registry_destroy(registry);
+    return BONGOCAT_SUCCESS;
+}
+
+bongocat_error_t wayland_init(config_t *config) {
+    BONGOCAT_CHECK_NULL(config, BONGOCAT_ERROR_INVALID_PARAM);
+
+    current_config = config;
+    bongocat_log_info("Initializing Wayland connection");
+
+    display = wl_display_connect(NULL);
+    if (!display) {
+        bongocat_log_error("Failed to connect to Wayland display");
+        return BONGOCAT_ERROR_WAYLAND;
+    }
+
+    bongocat_error_t result;
+    if ((result = wayland_setup_protocols()) != BONGOCAT_SUCCESS ||
+        (result = wayland_setup_surface()) != BONGOCAT_SUCCESS ||
+        (result = wayland_setup_buffer()) != BONGOCAT_SUCCESS) {
+        wayland_cleanup();
+        return result;
+    }
 
     bongocat_log_info("Wayland initialization complete (%dx%d buffer)",
-                     config->screen_width, config->bar_height);
+                     current_config->screen_width, current_config->bar_height);
     return BONGOCAT_SUCCESS;
 }
 
@@ -561,41 +546,29 @@ bongocat_error_t wayland_run(volatile sig_atomic_t *running) {
     BONGOCAT_CHECK_NULL(running, BONGOCAT_ERROR_INVALID_PARAM);
 
     bongocat_log_info("Starting Wayland event loop");
-    
-    struct timeval last_fullscreen_check = {0};
-    const int fullscreen_check_interval_ms = 100; // Check every 50ms for fast response
+    const int check_interval_ms = 100;
 
     while (*running && display) {
-        // Check for fullscreen status periodically
+        // Periodic fullscreen check for fallback detection
         struct timeval now;
         gettimeofday(&now, NULL);
-        long elapsed_ms = (now.tv_sec - last_fullscreen_check.tv_sec) * 1000 + 
-                         (now.tv_usec - last_fullscreen_check.tv_usec) / 1000;
+        long elapsed_ms = (now.tv_sec - fs_detector.last_check.tv_sec) * 1000 + 
+                         (now.tv_usec - fs_detector.last_check.tv_usec) / 1000;
         
-        if (elapsed_ms >= fullscreen_check_interval_ms) {
-            bongocat_log_debug("Performing fullscreen check (interval: %dms)", fullscreen_check_interval_ms);
-            bool new_fullscreen_state = check_fullscreen_status();
-            if (new_fullscreen_state != fullscreen_detected) {
-                fullscreen_detected = new_fullscreen_state;
-                bongocat_log_info("Fullscreen state changed: %s", 
-                                 fullscreen_detected ? "detected" : "cleared");
-                
-                // Trigger a redraw with the new opacity
-                if (configured) {
-                    bongocat_log_debug("Triggering redraw due to fullscreen state change");
-                    draw_bar();
-                }
+        if (elapsed_ms >= check_interval_ms) {
+            bool new_state = fs_check_status();
+            if (new_state != fullscreen_detected) {
+                fs_update_state(new_state);
             }
-            last_fullscreen_check = now;
+            fs_detector.last_check = now;
         }
 
-        // Use non-blocking dispatch with timeout
+        // Handle Wayland events
         struct pollfd pfd = {
             .fd = wl_display_get_fd(display),
             .events = POLLIN,
         };
         
-        // Prepare display for reading
         while (wl_display_prepare_read(display) != 0) {
             if (wl_display_dispatch_pending(display) == -1) {
                 bongocat_log_error("Failed to dispatch pending events");
@@ -603,23 +576,17 @@ bongocat_error_t wayland_run(volatile sig_atomic_t *running) {
             }
         }
         
-        // Poll with timeout to allow periodic fullscreen checks
-        int poll_result = poll(&pfd, 1, 100); // 100ms timeout
+        int poll_result = poll(&pfd, 1, 100);
         
         if (poll_result > 0) {
-            if (wl_display_read_events(display) == -1) {
-                bongocat_log_error("Failed to read Wayland events");
-                return BONGOCAT_ERROR_WAYLAND;
-            }
-            if (wl_display_dispatch_pending(display) == -1) {
-                bongocat_log_error("Failed to dispatch Wayland events");
+            if (wl_display_read_events(display) == -1 ||
+                wl_display_dispatch_pending(display) == -1) {
+                bongocat_log_error("Failed to handle Wayland events");
                 return BONGOCAT_ERROR_WAYLAND;
             }
         } else if (poll_result == 0) {
-            // Timeout - cancel the read
             wl_display_cancel_read(display);
         } else {
-            // Error
             wl_display_cancel_read(display);
             if (errno != EINTR) {
                 bongocat_log_error("Poll error: %s", strerror(errno));
@@ -627,18 +594,31 @@ bongocat_error_t wayland_run(volatile sig_atomic_t *running) {
             }
         }
 
-        // Flush any pending requests
-        if (wl_display_flush(display) == -1) {
-            bongocat_log_warning("Failed to flush Wayland display");
-        }
+        wl_display_flush(display);
     }
 
     bongocat_log_info("Wayland event loop exited");
     return BONGOCAT_SUCCESS;
 }
 
+// =============================================================================
+// PUBLIC API IMPLEMENTATION
+// =============================================================================
+
 int wayland_get_screen_width(void) {
-    return wayland_screen_width;
+    return screen_info.screen_width;
+}
+
+void wayland_update_config(config_t *config) {
+    if (!config) {
+        bongocat_log_error("Cannot update wayland config: config is NULL");
+        return;
+    }
+
+    current_config = config;
+    if (configured) {
+        draw_bar();
+    }
 }
 
 void wayland_cleanup(void) {
@@ -649,12 +629,9 @@ void wayland_cleanup(void) {
         buffer = NULL;
     }
 
-    if (pixels) {
-        // Calculate buffer size for unmapping
-        if (current_config) {
-            int size = current_config->screen_width * current_config->bar_height * 4;
-            munmap(pixels, size);
-        }
+    if (pixels && current_config) {
+        int size = current_config->screen_width * current_config->bar_height * 4;
+        munmap(pixels, size);
         pixels = NULL;
     }
 
@@ -683,9 +660,9 @@ void wayland_cleanup(void) {
         xdg_wm_base = NULL;
     }
 
-    if (foreign_toplevel_manager) {
-        zwlr_foreign_toplevel_manager_v1_destroy(foreign_toplevel_manager);
-        foreign_toplevel_manager = NULL;
+    if (fs_detector.manager) {
+        zwlr_foreign_toplevel_manager_v1_destroy(fs_detector.manager);
+        fs_detector.manager = NULL;
     }
 
     if (shm) {
@@ -703,45 +680,24 @@ void wayland_cleanup(void) {
         display = NULL;
     }
 
+    // Reset state
     configured = false;
     fullscreen_detected = false;
-    has_fullscreen_toplevel = false;
-    wayland_screen_width = 0;
-    wayland_screen_height = 0;
-    wayland_transform = WL_OUTPUT_TRANSFORM_NORMAL;
-    wayland_raw_width = 0;
-    wayland_raw_height = 0;
-    wayland_mode_received = false;
-    wayland_geometry_received = false;
+    memset(&fs_detector, 0, sizeof(fs_detector));
+    memset(&screen_info, 0, sizeof(screen_info));
+    
     bongocat_log_debug("Wayland cleanup complete");
 }
 
-void wayland_update_config(config_t *config) {
-    if (!config) {
-        bongocat_log_error("Cannot update wayland config: config is NULL");
-        return;
-    }
-
-    bongocat_log_info("Updating wayland config");
-    current_config = config;
-
-    // Trigger a redraw with the new config
-    if (configured) {
-        draw_bar();
-        bongocat_log_info("Wayland config updated and redrawn");
-    }
-}
-
+// Legacy API compatibility (deprecated)
 void wayland_switch_to_overlay_layer(void) {
-    // No longer needed - we use opacity-based hiding
     bongocat_log_info("Layer switching disabled - using opacity-based hiding");
 }
 
 void wayland_switch_to_top_layer(void) {
-    // No longer needed - we use opacity-based hiding
     bongocat_log_info("Layer switching disabled - using opacity-based hiding");
 }
 
 const char* wayland_get_current_layer_name(void) {
-    return "OVERLAY"; // Always on overlay layer now
+    return "OVERLAY";
 }
