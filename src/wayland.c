@@ -100,11 +100,11 @@ static bool fs_check_compositor_fallback(void) {
     // Try Sway as fallback
     fp = popen("swaymsg -t get_tree 2>/dev/null", "r");
     if (fp) {
-        char buffer[4096];
+        char sway_buffer[4096];
         bool is_fullscreen = false;
         
-        while (fgets(buffer, sizeof(buffer), fp)) {
-            if (strstr(buffer, "\"fullscreen_mode\":1")) {
+        while (fgets(sway_buffer, sizeof(sway_buffer), fp)) {
+            if (strstr(sway_buffer, "\"fullscreen_mode\":1")) {
                 is_fullscreen = true;
                 bongocat_log_debug("Fullscreen detected in Sway");
                 break;
@@ -149,17 +149,39 @@ static void fs_handle_toplevel_closed(void *data, struct zwlr_foreign_toplevel_h
 }
 
 // Minimal event handlers for unused events
-static void fs_handle_unused(void) { /* Unused events */ }
+static void fs_handle_title(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, const char *title) {
+    (void)data; (void)handle; (void)title;
+}
+
+static void fs_handle_app_id(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, const char *app_id) {
+    (void)data; (void)handle; (void)app_id;
+}
+
+static void fs_handle_output_enter(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, struct wl_output *output) {
+    (void)data; (void)handle; (void)output;
+}
+
+static void fs_handle_output_leave(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, struct wl_output *output) {
+    (void)data; (void)handle; (void)output;
+}
+
+static void fs_handle_done(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle) {
+    (void)data; (void)handle;
+}
+
+static void fs_handle_parent(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, struct zwlr_foreign_toplevel_handle_v1 *parent) {
+    (void)data; (void)handle; (void)parent;
+}
 
 static const struct zwlr_foreign_toplevel_handle_v1_listener fs_toplevel_listener = {
-    .title = (void*)fs_handle_unused,
-    .app_id = (void*)fs_handle_unused,
-    .output_enter = (void*)fs_handle_unused,
-    .output_leave = (void*)fs_handle_unused,
+    .title = fs_handle_title,
+    .app_id = fs_handle_app_id,
+    .output_enter = fs_handle_output_enter,
+    .output_leave = fs_handle_output_leave,
     .state = fs_handle_toplevel_state,
-    .done = (void*)fs_handle_unused,
+    .done = fs_handle_done,
     .closed = fs_handle_toplevel_closed,
-    .parent = (void*)fs_handle_unused,
+    .parent = fs_handle_parent,
 };
 
 static void fs_handle_manager_toplevel(void *data, struct zwlr_foreign_toplevel_manager_v1 *manager, 
