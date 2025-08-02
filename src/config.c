@@ -4,7 +4,10 @@
 #include "memory.h"
 #include <limits.h>
 
-// Configuration validation ranges
+// =============================================================================
+// CONFIGURATION CONSTANTS AND VALIDATION RANGES
+// =============================================================================
+
 #define MIN_CAT_HEIGHT 10
 #define MAX_CAT_HEIGHT 200
 #define MIN_OVERLAY_HEIGHT 20
@@ -15,57 +18,45 @@
 #define MAX_DURATION 5000
 #define MAX_INTERVAL 3600
 
+// =============================================================================
+// GLOBAL STATE FOR DEVICE MANAGEMENT
+// =============================================================================
+
 static char **config_keyboard_devices = NULL;
 static int config_num_devices = 0;
 
-static bongocat_error_t validate_config(config_t *config) {
-    BONGOCAT_CHECK_NULL(config, BONGOCAT_ERROR_INVALID_PARAM);
-    
-    // Validate cat dimensions
-    if (config->cat_height < MIN_CAT_HEIGHT || config->cat_height > MAX_CAT_HEIGHT) {
-        bongocat_log_warning("cat_height %d out of range [%d-%d], clamping", 
-                           config->cat_height, MIN_CAT_HEIGHT, MAX_CAT_HEIGHT);
-        config->cat_height = config->cat_height < MIN_CAT_HEIGHT ? MIN_CAT_HEIGHT : MAX_CAT_HEIGHT;
+// =============================================================================
+// CONFIGURATION VALIDATION MODULE
+// =============================================================================
+
+static void config_clamp_int(int *value, int min, int max, const char *name) {
+    if (*value < min || *value > max) {
+        bongocat_log_warning("%s %d out of range [%d-%d], clamping", name, *value, min, max);
+        *value = (*value < min) ? min : max;
     }
-    
-    if (config->overlay_height < MIN_OVERLAY_HEIGHT || config->overlay_height > MAX_OVERLAY_HEIGHT) {
-        bongocat_log_warning("overlay_height %d out of range [%d-%d], clamping", 
-                           config->overlay_height, MIN_OVERLAY_HEIGHT, MAX_OVERLAY_HEIGHT);
-        config->overlay_height = config->overlay_height < MIN_OVERLAY_HEIGHT ? MIN_OVERLAY_HEIGHT : MAX_OVERLAY_HEIGHT;
-    }
-    
-    // Validate FPS
-    if (config->fps < MIN_FPS || config->fps > MAX_FPS) {
-        bongocat_log_warning("fps %d out of range [%d-%d], clamping", 
-                           config->fps, MIN_FPS, MAX_FPS);
-        config->fps = config->fps < MIN_FPS ? MIN_FPS : MAX_FPS;
-    }
-    
-    // Validate durations
-    if (config->keypress_duration < MIN_DURATION || config->keypress_duration > MAX_DURATION) {
-        bongocat_log_warning("keypress_duration %d out of range [%d-%d], clamping", 
-                           config->keypress_duration, MIN_DURATION, MAX_DURATION);
-        config->keypress_duration = config->keypress_duration < MIN_DURATION ? MIN_DURATION : MAX_DURATION;
-    }
-    
-    if (config->test_animation_duration < MIN_DURATION || config->test_animation_duration > MAX_DURATION) {
-        bongocat_log_warning("test_animation_duration %d out of range [%d-%d], clamping", 
-                           config->test_animation_duration, MIN_DURATION, MAX_DURATION);
-        config->test_animation_duration = config->test_animation_duration < MIN_DURATION ? MIN_DURATION : MAX_DURATION;
-    }
+}
+
+static void config_validate_dimensions(config_t *config) {
+    config_clamp_int(&config->cat_height, MIN_CAT_HEIGHT, MAX_CAT_HEIGHT, "cat_height");
+    config_clamp_int(&config->overlay_height, MIN_OVERLAY_HEIGHT, MAX_OVERLAY_HEIGHT, "overlay_height");
+}
+
+static void config_validate_timing(config_t *config) {
+    config_clamp_int(&config->fps, MIN_FPS, MAX_FPS, "fps");
+    config_clamp_int(&config->keypress_duration, MIN_DURATION, MAX_DURATION, "keypress_duration");
+    config_clamp_int(&config->test_animation_duration, MIN_DURATION, MAX_DURATION, "test_animation_duration");
     
     // Validate interval (0 is allowed to disable)
     if (config->test_animation_interval < 0 || config->test_animation_interval > MAX_INTERVAL) {
         bongocat_log_warning("test_animation_interval %d out of range [0-%d], clamping", 
                            config->test_animation_interval, MAX_INTERVAL);
-        config->test_animation_interval = config->test_animation_interval < 0 ? 0 : MAX_INTERVAL;
+        config->test_animation_interval = (config->test_animation_interval < 0) ? 0 : MAX_INTERVAL;
     }
-    
+}
+
+static void config_validate_appearance(config_t *config) {
     // Validate opacity
-    if (config->overlay_opacity < 0 || config->overlay_opacity > 255) {
-        bongocat_log_warning("overlay_opacity %d out of range [0-255], clamping", config->overlay_opacity);
-        config->overlay_opacity = config->overlay_opacity < 0 ? 0 : 255;
-    }
+    config_clamp_int(&config->overlay_opacity, 0, 255, "overlay_opacity");
     
     // Validate idle frame
     if (config->idle_frame < 0 || config->idle_frame >= NUM_FRAMES) {
@@ -73,13 +64,9 @@ static bongocat_error_t validate_config(config_t *config) {
                            config->idle_frame, NUM_FRAMES - 1);
         config->idle_frame = 0;
     }
-    
-    // Validate enable_debug
-    config->enable_debug = config->enable_debug ? 1 : 0;
-    
-    // Validate hide_on_fullscreen
-    config->hide_on_fullscreen = config->hide_on_fullscreen ? 1 : 0;
-    
+}
+
+static void config_validate_enums(config_t *config) {
     // Validate layer
     if (config->layer != LAYER_TOP && config->layer != LAYER_OVERLAY) {
         bongocat_log_warning("Invalid layer %d, resetting to top", config->layer);
@@ -91,17 +78,175 @@ static bongocat_error_t validate_config(config_t *config) {
         bongocat_log_warning("Invalid overlay_position %d, resetting to top", config->overlay_position);
         config->overlay_position = POSITION_TOP;
     }
-    
+}
+
+static void config_validate_positioning(config_t *config) {
     // Validate cat positioning doesn't go off-screen
     if (abs(config->cat_x_offset) > config->screen_width) {
         bongocat_log_warning("cat_x_offset %d may position cat off-screen (screen width: %d)", 
                            config->cat_x_offset, config->screen_width);
     }
+}
+
+static bongocat_error_t config_validate(config_t *config) {
+    BONGOCAT_CHECK_NULL(config, BONGOCAT_ERROR_INVALID_PARAM);
+    
+    config_validate_dimensions(config);
+    config_validate_timing(config);
+    config_validate_appearance(config);
+    config_validate_enums(config);
+    config_validate_positioning(config);
+    
+    // Normalize boolean values
+    config->enable_debug = config->enable_debug ? 1 : 0;
+    config->hide_on_fullscreen = config->hide_on_fullscreen ? 1 : 0;
     
     return BONGOCAT_SUCCESS;
 }
 
-static bongocat_error_t parse_config_file(config_t *config, const char *config_file_path) {
+// =============================================================================
+// DEVICE MANAGEMENT MODULE
+// =============================================================================
+
+static bongocat_error_t config_add_keyboard_device(config_t *config, const char *device_path) {
+    // Reallocate device array
+    config_keyboard_devices = realloc(config_keyboard_devices, 
+                                     (config_num_devices + 1) * sizeof(char*));
+    if (!config_keyboard_devices) {
+        bongocat_log_error("Failed to allocate memory for keyboard_devices");
+        return BONGOCAT_ERROR_MEMORY;
+    }
+    
+    size_t path_len = strlen(device_path);
+    config_keyboard_devices[config_num_devices] = BONGOCAT_MALLOC(path_len + 1);
+    if (!config_keyboard_devices[config_num_devices]) {
+        bongocat_log_error("Failed to allocate memory for keyboard_device entry");
+        return BONGOCAT_ERROR_MEMORY;
+    }
+    
+    strncpy(config_keyboard_devices[config_num_devices], device_path, path_len);
+    config_keyboard_devices[config_num_devices][path_len] = '\0';
+    config_num_devices++;
+    
+    config->keyboard_devices = config_keyboard_devices;
+    config->num_keyboard_devices = config_num_devices;
+    
+    return BONGOCAT_SUCCESS;
+}
+
+static void config_cleanup_devices(void) {
+    if (config_keyboard_devices) {
+        for (int i = 0; i < config_num_devices; i++) {
+            BONGOCAT_SAFE_FREE(config_keyboard_devices[i]);
+        }
+        BONGOCAT_SAFE_FREE(config_keyboard_devices);
+        config_keyboard_devices = NULL;
+        config_num_devices = 0;
+    }
+}
+
+// =============================================================================
+// CONFIGURATION PARSING MODULE
+// =============================================================================
+
+static char* config_trim_key(char *key) {
+    char *key_start = key;
+    while (*key_start == ' ' || *key_start == '\t') key_start++;
+    
+    char *key_end = key_start + strlen(key_start) - 1;
+    while (key_end > key_start && (*key_end == ' ' || *key_end == '\t')) {
+        *key_end = '\0';
+        key_end--;
+    }
+    
+    return key_start;
+}
+
+static bongocat_error_t config_parse_integer_key(config_t *config, const char *key, const char *value) {
+    int int_value = (int)strtol(value, NULL, 10);
+    
+    if (strcmp(key, "cat_x_offset") == 0) {
+        config->cat_x_offset = int_value;
+    } else if (strcmp(key, "cat_y_offset") == 0) {
+        config->cat_y_offset = int_value;
+    } else if (strcmp(key, "cat_height") == 0) {
+        config->cat_height = int_value;
+    } else if (strcmp(key, "overlay_height") == 0) {
+        config->overlay_height = int_value;
+    } else if (strcmp(key, "idle_frame") == 0) {
+        config->idle_frame = int_value;
+    } else if (strcmp(key, "keypress_duration") == 0) {
+        config->keypress_duration = int_value;
+    } else if (strcmp(key, "test_animation_duration") == 0) {
+        config->test_animation_duration = int_value;
+    } else if (strcmp(key, "test_animation_interval") == 0) {
+        config->test_animation_interval = int_value;
+    } else if (strcmp(key, "fps") == 0) {
+        config->fps = int_value;
+    } else if (strcmp(key, "overlay_opacity") == 0) {
+        config->overlay_opacity = int_value;
+    } else if (strcmp(key, "enable_debug") == 0) {
+        config->enable_debug = int_value;
+    } else if (strcmp(key, "hide_on_fullscreen") == 0) {
+        config->hide_on_fullscreen = int_value;
+    } else {
+        return BONGOCAT_ERROR_INVALID_PARAM; // Unknown key
+    }
+    
+    return BONGOCAT_SUCCESS;
+}
+
+static bongocat_error_t config_parse_enum_key(config_t *config, const char *key, const char *value) {
+    if (strcmp(key, "layer") == 0) {
+        if (strcmp(value, "top") == 0) {
+            config->layer = LAYER_TOP;
+        } else if (strcmp(value, "overlay") == 0) {
+            config->layer = LAYER_OVERLAY;
+        } else {
+            bongocat_log_warning("Invalid layer '%s', using 'top'", value);
+            config->layer = LAYER_TOP;
+        }
+    } else if (strcmp(key, "overlay_position") == 0) {
+        if (strcmp(value, "top") == 0) {
+            config->overlay_position = POSITION_TOP;
+        } else if (strcmp(value, "bottom") == 0) {
+            config->overlay_position = POSITION_BOTTOM;
+        } else {
+            bongocat_log_warning("Invalid overlay_position '%s', using 'top'", value);
+            config->overlay_position = POSITION_TOP;
+        }
+    } else {
+        return BONGOCAT_ERROR_INVALID_PARAM; // Unknown key
+    }
+    
+    return BONGOCAT_SUCCESS;
+}
+
+static bongocat_error_t config_parse_key_value(config_t *config, const char *key, const char *value) {
+    // Try integer keys first
+    if (config_parse_integer_key(config, key, value) == BONGOCAT_SUCCESS) {
+        return BONGOCAT_SUCCESS;
+    }
+    
+    // Try enum keys
+    if (config_parse_enum_key(config, key, value) == BONGOCAT_SUCCESS) {
+        return BONGOCAT_SUCCESS;
+    }
+    
+    // Handle device keys
+    if (strcmp(key, "keyboard_device") == 0 || strcmp(key, "keyboard_devices") == 0) {
+        return config_add_keyboard_device(config, value);
+    }
+    
+    // Unknown key
+    return BONGOCAT_ERROR_INVALID_PARAM;
+}
+
+static bool config_is_comment_or_empty(const char *line) {
+    return (line[0] == '#' || line[0] == '\0' || strspn(line, " \t") == strlen(line));
+}
+
+static bongocat_error_t config_parse_file(config_t *config, const char *config_file_path) {
     BONGOCAT_CHECK_NULL(config, BONGOCAT_ERROR_INVALID_PARAM);
     
     const char *file_path = config_file_path ? config_file_path : "bongocat.conf";
@@ -127,86 +272,20 @@ static bongocat_error_t parse_config_file(config_t *config, const char *config_f
         }
         
         // Skip comments and empty lines
-        if (line[0] == '#' || line[0] == '\0' || strspn(line, " \t") == strlen(line)) {
+        if (config_is_comment_or_empty(line)) {
             continue;
         }
         
         // Parse key=value pairs
         if (sscanf(line, " %255[^=] = %255s", key, value) == 2) {
-            // Trim whitespace from key
-            char *key_start = key;
-            while (*key_start == ' ' || *key_start == '\t') key_start++;
-            char *key_end = key_start + strlen(key_start) - 1;
-            while (key_end > key_start && (*key_end == ' ' || *key_end == '\t')) {
-                *key_end = '\0';
-                key_end--;
-            }
+            char *trimmed_key = config_trim_key(key);
             
-            if (strcmp(key_start, "cat_x_offset") == 0) {
-                config->cat_x_offset = (int)strtol(value, NULL, 10);
-            } else if (strcmp(key_start, "cat_y_offset") == 0) {
-                config->cat_y_offset = (int)strtol(value, NULL, 10);
-            } else if (strcmp(key_start, "cat_height") == 0) {
-                config->cat_height = (int)strtol(value, NULL, 10);
-            } else if (strcmp(key_start, "overlay_height") == 0) {
-                config->overlay_height = (int)strtol(value, NULL, 10);
-            } else if (strcmp(key_start, "idle_frame") == 0) {
-                config->idle_frame = (int)strtol(value, NULL, 10);
-            } else if (strcmp(key_start, "keypress_duration") == 0) {
-                config->keypress_duration = (int)strtol(value, NULL, 10);
-            } else if (strcmp(key_start, "test_animation_duration") == 0) {
-                config->test_animation_duration = (int)strtol(value, NULL, 10);
-            } else if (strcmp(key_start, "test_animation_interval") == 0) {
-                config->test_animation_interval = (int)strtol(value, NULL, 10);
-            } else if (strcmp(key_start, "fps") == 0) {
-                config->fps = (int)strtol(value, NULL, 10);
-            } else if (strcmp(key_start, "overlay_opacity") == 0) {
-                config->overlay_opacity = (int)strtol(value, NULL, 10);
-            } else if (strcmp(key_start, "enable_debug") == 0) {
-                config->enable_debug = (int)strtol(value, NULL, 10);
-            } else if (strcmp(key_start, "hide_on_fullscreen") == 0) {
-                config->hide_on_fullscreen = (int)strtol(value, NULL, 10);
-            } else if (strcmp(key_start, "layer") == 0) {
-                if (strcmp(value, "top") == 0) {
-                    config->layer = LAYER_TOP;
-                } else if (strcmp(value, "overlay") == 0) {
-                    config->layer = LAYER_OVERLAY;
-                } else {
-                    bongocat_log_warning("Invalid layer '%s', using 'top'", value);
-                    config->layer = LAYER_TOP;
-                }
-            } else if (strcmp(key_start, "overlay_position") == 0) {
-                if (strcmp(value, "top") == 0) {
-                    config->overlay_position = POSITION_TOP;
-                } else if (strcmp(value, "bottom") == 0) {
-                    config->overlay_position = POSITION_BOTTOM;
-                } else {
-                    bongocat_log_warning("Invalid overlay_position '%s', using 'top'", value);
-                    config->overlay_position = POSITION_TOP;
-                }
-            } else if (strcmp(key_start, "keyboard_device") == 0 || strcmp(key_start, "keyboard_devices") == 0) {
-                // Reallocate device array
-                config_keyboard_devices = realloc(config_keyboard_devices, 
-                                                 (config_num_devices + 1) * sizeof(char*));
-                if (!config_keyboard_devices) {
-                    bongocat_log_error("Failed to allocate memory for keyboard_devices");
-                    result = BONGOCAT_ERROR_MEMORY;
-                } else {
-                    size_t value_len = strlen(value);
-                    config_keyboard_devices[config_num_devices] = BONGOCAT_MALLOC(value_len + 1);
-                    if (config_keyboard_devices[config_num_devices]) {
-                        strncpy(config_keyboard_devices[config_num_devices], value, value_len);
-                        config_keyboard_devices[config_num_devices][value_len] = '\0';
-                        config_num_devices++;
-                        config->keyboard_devices = config_keyboard_devices;
-                        config->num_keyboard_devices = config_num_devices;
-                    } else {
-                        bongocat_log_error("Failed to allocate memory for keyboard_device entry");
-                        result = BONGOCAT_ERROR_MEMORY;
-                    }
-                }
-            } else {
-                bongocat_log_warning("Unknown configuration key '%s' at line %d", key_start, line_number);
+            bongocat_error_t parse_result = config_parse_key_value(config, trimmed_key, value);
+            if (parse_result == BONGOCAT_ERROR_INVALID_PARAM) {
+                bongocat_log_warning("Unknown configuration key '%s' at line %d", trimmed_key, line_number);
+            } else if (parse_result != BONGOCAT_SUCCESS) {
+                result = parse_result;
+                break;
             }
         } else if (strlen(line) > 0) {
             bongocat_log_warning("Invalid configuration line %d: %s", line_number, line);
@@ -216,26 +295,17 @@ static bongocat_error_t parse_config_file(config_t *config, const char *config_f
     fclose(file);
     
     if (result == BONGOCAT_SUCCESS) {
-        bongocat_log_info("Loaded configuration from bongocat.conf");
+        bongocat_log_info("Loaded configuration from %s", file_path);
     }
     
     return result;
 }
 
-bongocat_error_t load_config(config_t *config, const char *config_file_path) {
-    BONGOCAT_CHECK_NULL(config, BONGOCAT_ERROR_INVALID_PARAM);
-    
-    // Clear existing keyboard devices to prevent accumulation during reloads
-    if (config_keyboard_devices) {
-        for (int i = 0; i < config_num_devices; i++) {
-            BONGOCAT_SAFE_FREE(config_keyboard_devices[i]);
-        }
-        BONGOCAT_SAFE_FREE(config_keyboard_devices);
-        config_keyboard_devices = NULL;
-        config_num_devices = 0;
-    }
-    
-    // Initialize with defaults
+// =============================================================================
+// DEFAULT CONFIGURATION MODULE
+// =============================================================================
+
+static void config_set_defaults(config_t *config) {
     *config = (config_t) {
         .screen_width = DEFAULT_SCREEN_WIDTH,  // Will be updated by Wayland detection
         .bar_height = DEFAULT_BAR_HEIGHT,
@@ -246,7 +316,7 @@ bongocat_error_t load_config(config_t *config, const char *config_file_path) {
         },
         .keyboard_devices = NULL,
         .num_keyboard_devices = 0,
-        .cat_x_offset = 100,  // Default values from current config
+        .cat_x_offset = 100,
         .cat_y_offset = 10,
         .cat_height = 40,
         .overlay_height = 50,
@@ -261,41 +331,25 @@ bongocat_error_t load_config(config_t *config, const char *config_file_path) {
         .layer = LAYER_TOP,  // Default to TOP for broader compatibility
         .overlay_position = POSITION_TOP
     };
-    
-    // Set default keyboard device if none specified
+}
+
+static bongocat_error_t config_set_default_devices(config_t *config) {
     if (config_num_devices == 0) {
-        config_keyboard_devices = BONGOCAT_MALLOC(sizeof(char*));
-        if (config_keyboard_devices) {
-            config_keyboard_devices[0] = BONGOCAT_MALLOC(strlen("/dev/input/event4") + 1);
-            if (config_keyboard_devices[0]) {
-                strcpy(config_keyboard_devices[0], "/dev/input/event4");
-                config_num_devices = 1;
-                config->keyboard_devices = config_keyboard_devices;
-                config->num_keyboard_devices = config_num_devices;
-            }
-        }
+        const char *default_device = "/dev/input/event4";
+        return config_add_keyboard_device(config, default_device);
     }
-    
-    // Parse config file and override defaults
-    bongocat_error_t result = parse_config_file(config, config_file_path);
-    if (result != BONGOCAT_SUCCESS) {
-        bongocat_log_error("Failed to parse configuration file: %s", bongocat_error_string(result));
-        return result;
-    }
-    
-    // Validate and sanitize configuration
-    result = validate_config(config);
-    if (result != BONGOCAT_SUCCESS) {
-        bongocat_log_error("Configuration validation failed: %s", bongocat_error_string(result));
-        return result;
-    }
-    
+    return BONGOCAT_SUCCESS;
+}
+
+static void config_finalize(config_t *config) {
     // Update bar_height from config
     config->bar_height = config->overlay_height;
     
     // Initialize error system with debug setting
     bongocat_error_init(config->enable_debug);
-    
+}
+
+static void config_log_summary(const config_t *config) {
     bongocat_log_debug("Configuration loaded successfully");
     bongocat_log_debug("  Screen: %dx%d", config->screen_width, config->bar_height);
     bongocat_log_debug("  Cat: %dx%d at offset (%d,%d)", 
@@ -305,18 +359,53 @@ bongocat_error_t load_config(config_t *config, const char *config_file_path) {
     bongocat_log_debug("  Position: %s", config->overlay_position == POSITION_TOP ? "top" : "bottom");
     bongocat_log_debug("  Layer: %s", config->layer == LAYER_TOP ? "top" : "overlay");
     bongocat_log_debug("  Hide on fullscreen: %s", config->hide_on_fullscreen ? "enabled" : "disabled");
+}
+
+// =============================================================================
+// PUBLIC API IMPLEMENTATION
+// =============================================================================
+
+bongocat_error_t load_config(config_t *config, const char *config_file_path) {
+    BONGOCAT_CHECK_NULL(config, BONGOCAT_ERROR_INVALID_PARAM);
+    
+    // Clear existing keyboard devices to prevent accumulation during reloads
+    config_cleanup_devices();
+    
+    // Initialize with defaults
+    config_set_defaults(config);
+    
+    // Set default keyboard device if none specified
+    bongocat_error_t result = config_set_default_devices(config);
+    if (result != BONGOCAT_SUCCESS) {
+        bongocat_log_error("Failed to set default keyboard devices: %s", bongocat_error_string(result));
+        return result;
+    }
+    
+    // Parse config file and override defaults
+    result = config_parse_file(config, config_file_path);
+    if (result != BONGOCAT_SUCCESS) {
+        bongocat_log_error("Failed to parse configuration file: %s", bongocat_error_string(result));
+        return result;
+    }
+    
+    // Validate and sanitize configuration
+    result = config_validate(config);
+    if (result != BONGOCAT_SUCCESS) {
+        bongocat_log_error("Configuration validation failed: %s", bongocat_error_string(result));
+        return result;
+    }
+    
+    // Finalize configuration
+    config_finalize(config);
+    
+    // Log configuration summary
+    config_log_summary(config);
     
     return BONGOCAT_SUCCESS;
 }
 
 void config_cleanup(void) {
-    if (config_keyboard_devices) {
-        for (int i = 0; i < config_num_devices; i++) {
-            BONGOCAT_SAFE_FREE(config_keyboard_devices[i]);
-        }
-        BONGOCAT_SAFE_FREE(config_keyboard_devices);
-        config_num_devices = 0;
-    }
+    config_cleanup_devices();
 }
 
 int get_screen_width(void) {
