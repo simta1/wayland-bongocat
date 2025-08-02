@@ -3,6 +3,7 @@
 #include "animation.h"
 #include <poll.h>
 #include <sys/time.h>
+#include "../protocols/wlr-foreign-toplevel-management-v1-client-protocol.h"
 
 // Wayland globals
 bool configured = false;
@@ -12,6 +13,7 @@ struct wl_compositor *compositor;
 struct wl_shm *shm;
 struct zwlr_layer_shell_v1 *layer_shell;
 struct xdg_wm_base *xdg_wm_base;
+struct zwlr_foreign_toplevel_manager_v1 *foreign_toplevel_manager;
 struct wl_output *output;
 struct wl_surface *surface;
 struct wl_buffer *buffer;
@@ -29,15 +31,120 @@ static bool wayland_geometry_received = false;
 
 static config_t *current_config;
 
-// Function to check if any window is fullscreen (compositor-specific)
-static bool check_fullscreen_status(void) {
-    // Only check for fullscreen when using OVERLAY layer with fullscreen detection enabled
-    if (current_config->layer != LAYER_OVERLAY || !current_config->hide_on_fullscreen) {
-        bongocat_log_debug("Fullscreen detection disabled (layer=%s, hide_on_fullscreen=%d)", 
-                          current_config->layer == LAYER_OVERLAY ? "overlay" : "top",
-                          current_config->hide_on_fullscreen);
-        return false;
+// Foreign toplevel management
+static bool has_fullscreen_toplevel = false;
+
+// Note: We use opacity-based hiding instead of layer switching for better compatibility
+
+// Foreign toplevel handle event handlers
+static void foreign_toplevel_handle_title(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, const char *title) {
+    (void)data; (void)handle; (void)title;
+    // We don't need to track titles for fullscreen detection
+}
+
+static void foreign_toplevel_handle_app_id(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, const char *app_id) {
+    (void)data; (void)handle; (void)app_id;
+    // We don't need to track app IDs for fullscreen detection
+}
+
+static void foreign_toplevel_handle_output_enter(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, struct wl_output *output) {
+    (void)data; (void)handle; (void)output;
+    // We don't need to track output changes
+}
+
+static void foreign_toplevel_handle_output_leave(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, struct wl_output *output) {
+    (void)data; (void)handle; (void)output;
+    // We don't need to track output changes
+}
+
+static void foreign_toplevel_handle_state(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, struct wl_array *state) {
+    (void)data; (void)handle;
+    
+    bool is_fullscreen = false;
+    uint32_t *state_ptr;
+    
+    wl_array_for_each(state_ptr, state) {
+        if (*state_ptr == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_FULLSCREEN) {
+            is_fullscreen = true;
+            break;
+        }
     }
+    
+    // Update global fullscreen state
+    bool old_state = has_fullscreen_toplevel;
+    has_fullscreen_toplevel = is_fullscreen;
+    
+    if (old_state != has_fullscreen_toplevel) {
+        bongocat_log_info("Fullscreen state changed via Wayland protocol: %s", 
+                         has_fullscreen_toplevel ? "detected" : "cleared");
+        
+        // Update the global fullscreen_detected for compatibility
+        fullscreen_detected = has_fullscreen_toplevel;
+        
+        // Trigger redraw with new opacity
+        if (configured) {
+            draw_bar();
+        }
+    }
+}
+
+static void foreign_toplevel_handle_done(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle) {
+    (void)data; (void)handle;
+    // State updates are complete
+}
+
+static void foreign_toplevel_handle_closed(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle) {
+    (void)data;
+    zwlr_foreign_toplevel_handle_v1_destroy(handle);
+}
+
+static void foreign_toplevel_handle_parent(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, struct zwlr_foreign_toplevel_handle_v1 *parent) {
+    (void)data; (void)handle; (void)parent;
+    // We don't need to track parent relationships
+}
+
+static const struct zwlr_foreign_toplevel_handle_v1_listener foreign_toplevel_handle_listener = {
+    .title = foreign_toplevel_handle_title,
+    .app_id = foreign_toplevel_handle_app_id,
+    .output_enter = foreign_toplevel_handle_output_enter,
+    .output_leave = foreign_toplevel_handle_output_leave,
+    .state = foreign_toplevel_handle_state,
+    .done = foreign_toplevel_handle_done,
+    .closed = foreign_toplevel_handle_closed,
+    .parent = foreign_toplevel_handle_parent,
+};
+
+// Foreign toplevel manager event handlers
+static void foreign_toplevel_manager_handle_toplevel(void *data, struct zwlr_foreign_toplevel_manager_v1 *manager, struct zwlr_foreign_toplevel_handle_v1 *toplevel) {
+    (void)data; (void)manager;
+    
+    zwlr_foreign_toplevel_handle_v1_add_listener(toplevel, &foreign_toplevel_handle_listener, NULL);
+    bongocat_log_debug("New toplevel registered for fullscreen monitoring");
+}
+
+static void foreign_toplevel_manager_handle_finished(void *data, struct zwlr_foreign_toplevel_manager_v1 *manager) {
+    (void)data;
+    bongocat_log_info("Foreign toplevel manager finished");
+    zwlr_foreign_toplevel_manager_v1_destroy(manager);
+    foreign_toplevel_manager = NULL;
+}
+
+static const struct zwlr_foreign_toplevel_manager_v1_listener foreign_toplevel_manager_listener = {
+    .toplevel = foreign_toplevel_manager_handle_toplevel,
+    .finished = foreign_toplevel_manager_handle_finished,
+};
+
+// Function to check if any window is fullscreen
+static bool check_fullscreen_status(void) {
+    // If we have foreign toplevel manager, use the protocol-based detection
+    if (foreign_toplevel_manager) {
+        // The fullscreen state is updated via protocol events in real-time
+        // No need to poll - just return the current state
+        return has_fullscreen_toplevel;
+    }
+    
+    // Fallback to compositor-specific detection for compositors without the protocol
+    bongocat_log_debug("Using compositor-specific fullscreen detection (no foreign toplevel protocol)");
     
     // Try Hyprland first
     FILE *fp = popen("hyprctl activewindow 2>/dev/null", "r");
@@ -45,7 +152,6 @@ static bool check_fullscreen_status(void) {
         char line[512];
         bool is_fullscreen = false;
         
-        bongocat_log_debug("Checking Hyprland for fullscreen status");
         while (fgets(line, sizeof(line), fp)) {
             // Remove newline for cleaner logging
             size_t len = strlen(line);
@@ -53,7 +159,6 @@ static bool check_fullscreen_status(void) {
                 line[len-1] = '\0';
             }
             
-            bongocat_log_debug("Hyprctl line: %s", line);
             // Check for any fullscreen mode (1 = real fullscreen, 2 = fake fullscreen)
             if (strstr(line, "fullscreen: 1") || strstr(line, "fullscreen: 2") || strstr(line, "fullscreen: true")) {
                 is_fullscreen = true;
@@ -62,12 +167,10 @@ static bool check_fullscreen_status(void) {
             }
         }
         pclose(fp);
-        bongocat_log_debug("Hyprland fullscreen check result: %s", is_fullscreen ? "true" : "false");
         return is_fullscreen;
     }
     
     // Try sway as fallback
-    bongocat_log_debug("Hyprland not available, trying Sway");
     fp = popen("swaymsg -t get_tree 2>/dev/null", "r");
     if (fp) {
         char sway_buffer[4096];
@@ -81,7 +184,6 @@ static bool check_fullscreen_status(void) {
             }
         }
         pclose(fp);
-        bongocat_log_debug("Sway fullscreen check result: %s", is_fullscreen ? "true" : "false");
         return is_fullscreen;
     }
     
@@ -119,31 +221,19 @@ void draw_bar(void) {
         return;
     }
 
-    // Determine effective opacity based on fullscreen detection (only for OVERLAY layer)
-    int effective_opacity = current_config->overlay_opacity;
-    bool should_hide_overlay = (current_config->layer == LAYER_OVERLAY && 
-                               current_config->hide_on_fullscreen && 
-                               fullscreen_detected);
+    // Determine effective opacity based on fullscreen state
+    int effective_opacity = fullscreen_detected ? 0 : current_config->overlay_opacity;
     
-    if (should_hide_overlay) {
-        effective_opacity = 0;
-        bongocat_log_debug("Fullscreen detected, hiding overlay (opacity=0)");
-    }
-
-    // Clear entire buffer with configurable transparency
+    // Clear entire buffer with effective transparency
     for (int i = 0; i < current_config->screen_width * current_config->bar_height * 4; i += 4) {
         pixels[i] = 0;       // B
         pixels[i + 1] = 0;   // G
         pixels[i + 2] = 0;   // R
-        pixels[i + 3] = effective_opacity; // A (configurable transparency, 0 when fullscreen)
+        pixels[i + 3] = effective_opacity; // A (0 when fullscreen, normal opacity otherwise)
     }
 
-    // Only draw the cat if not in fullscreen mode (only applies to OVERLAY layer with fullscreen detection enabled)
-    bool should_hide_cat = (current_config->layer == LAYER_OVERLAY && 
-                           current_config->hide_on_fullscreen && 
-                           fullscreen_detected);
-    
-    if (!should_hide_cat) {
+    // Only draw the cat if not in fullscreen mode
+    if (!fullscreen_detected) {
         pthread_mutex_lock(&anim_lock);
         // Use configured cat height
         int cat_height = current_config->cat_height;
@@ -155,9 +245,9 @@ void draw_bar(void) {
                           anim_imgs[anim_index], anim_width[anim_index], anim_height[anim_index],
                           cat_x, cat_y, cat_width, cat_height);
         pthread_mutex_unlock(&anim_lock);
-        bongocat_log_debug("Cat drawn (fullscreen_detected=%s)", fullscreen_detected ? "true" : "false");
+        bongocat_log_debug("Cat drawn (visible)");
     } else {
-        bongocat_log_debug("Cat drawing skipped due to fullscreen detection");
+        bongocat_log_debug("Cat hidden due to fullscreen detection");
     }
 
     wl_surface_attach(surface, buffer, 0, 0);
@@ -293,6 +383,12 @@ static void registry_global(void *data __attribute__((unused)), struct wl_regist
             output = (struct wl_output *)wl_registry_bind(reg, name, &wl_output_interface, 2);
             wl_output_add_listener(output, &output_listener, NULL);
         }
+    } else if (strcmp(iface, zwlr_foreign_toplevel_manager_v1_interface.name) == 0) {
+        foreign_toplevel_manager = (struct zwlr_foreign_toplevel_manager_v1 *)wl_registry_bind(reg, name, &zwlr_foreign_toplevel_manager_v1_interface, 3);
+        if (foreign_toplevel_manager) {
+            zwlr_foreign_toplevel_manager_v1_add_listener(foreign_toplevel_manager, &foreign_toplevel_manager_listener, NULL);
+            bongocat_log_info("Foreign toplevel manager bound - using Wayland protocol for fullscreen detection");
+        }
     }
 }
 
@@ -364,16 +460,11 @@ bongocat_error_t wayland_init(config_t *config) {
         return BONGOCAT_ERROR_WAYLAND;
     }
 
-    // Use configurable layer - TOP for broader compatibility, OVERLAY for advanced compositors
-    uint32_t layer_type = (config->layer == LAYER_OVERLAY) ? 
-                         ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY : 
-                         ZWLR_LAYER_SHELL_V1_LAYER_TOP;
-    
+    // Always use OVERLAY layer (we'll hide via opacity instead of switching layers)
     layer_surface = zwlr_layer_shell_v1_get_layer_surface(layer_shell, surface, NULL,
-                                                          layer_type, "bongocat-overlay");
+                                                          ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY, "bongocat-overlay");
     
-    bongocat_log_debug("Using layer: %s", 
-                      (config->layer == LAYER_OVERLAY) ? "OVERLAY" : "TOP");
+    bongocat_log_info("Using OVERLAY layer (will hide via opacity when fullscreen detected)");
     if (!layer_surface) {
         bongocat_log_error("Failed to create layer surface");
         wl_surface_destroy(surface);
@@ -472,7 +563,7 @@ bongocat_error_t wayland_run(volatile sig_atomic_t *running) {
     bongocat_log_info("Starting Wayland event loop");
     
     struct timeval last_fullscreen_check = {0};
-    const int fullscreen_check_interval_ms = 500; // Check every 500ms
+    const int fullscreen_check_interval_ms = 100; // Check every 50ms for fast response
 
     while (*running && display) {
         // Check for fullscreen status periodically
@@ -488,7 +579,8 @@ bongocat_error_t wayland_run(volatile sig_atomic_t *running) {
                 fullscreen_detected = new_fullscreen_state;
                 bongocat_log_info("Fullscreen state changed: %s", 
                                  fullscreen_detected ? "detected" : "cleared");
-                // Trigger a redraw with the new state
+                
+                // Trigger a redraw with the new opacity
                 if (configured) {
                     bongocat_log_debug("Triggering redraw due to fullscreen state change");
                     draw_bar();
@@ -591,6 +683,11 @@ void wayland_cleanup(void) {
         xdg_wm_base = NULL;
     }
 
+    if (foreign_toplevel_manager) {
+        zwlr_foreign_toplevel_manager_v1_destroy(foreign_toplevel_manager);
+        foreign_toplevel_manager = NULL;
+    }
+
     if (shm) {
         wl_shm_destroy(shm);
         shm = NULL;
@@ -608,6 +705,7 @@ void wayland_cleanup(void) {
 
     configured = false;
     fullscreen_detected = false;
+    has_fullscreen_toplevel = false;
     wayland_screen_width = 0;
     wayland_screen_height = 0;
     wayland_transform = WL_OUTPUT_TRANSFORM_NORMAL;
@@ -632,4 +730,18 @@ void wayland_update_config(config_t *config) {
         draw_bar();
         bongocat_log_info("Wayland config updated and redrawn");
     }
+}
+
+void wayland_switch_to_overlay_layer(void) {
+    // No longer needed - we use opacity-based hiding
+    bongocat_log_info("Layer switching disabled - using opacity-based hiding");
+}
+
+void wayland_switch_to_top_layer(void) {
+    // No longer needed - we use opacity-based hiding
+    bongocat_log_info("Layer switching disabled - using opacity-based hiding");
+}
+
+const char* wayland_get_current_layer_name(void) {
+    return "OVERLAY"; // Always on overlay layer now
 }
