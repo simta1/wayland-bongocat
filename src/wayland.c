@@ -286,7 +286,6 @@ void draw_bar(void) {
                           anim_imgs[anim_index], anim_width[anim_index], anim_height[anim_index],
                           cat_x, cat_y, cat_width, cat_height);
         pthread_mutex_unlock(&anim_lock);
-        bongocat_log_debug("Cat drawn (visible)");
     } else {
         bongocat_log_debug("Cat hidden due to fullscreen detection");
     }
