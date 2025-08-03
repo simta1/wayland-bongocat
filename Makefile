@@ -37,11 +37,11 @@ OBJDIR = $(BUILDDIR)/obj
 PROTOCOLDIR = protocols
 WAYLAND_PROTOCOLS_DIR ?= /usr/share/wayland-protocols
 
-# Source files (excluding embedded assets which is generated)
-SOURCES = $(filter-out $(EMBEDDED_ASSETS_C), $(shell find $(SRCDIR) -name "*.c"))
-OBJECTS = $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o) $(OBJDIR)/graphics/embedded_assets.o
+# Source files (including embedded assets which are now committed)
+SOURCES = $(shell find $(SRCDIR) -name "*.c")
+OBJECTS = $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
 
-# Embedded assets
+# Embedded assets (now committed to git, use embed_assets.sh manually when assets change)
 EMBED_SCRIPT = scripts/embed_assets.sh
 EMBEDDED_ASSETS_H = $(INCDIR)/graphics/embedded_assets.h
 EMBEDDED_ASSETS_C = $(SRCDIR)/graphics/embedded_assets.c
@@ -56,15 +56,13 @@ TARGET = $(BUILDDIR)/bongocat
 
 .PHONY: all clean protocols embed-assets
 
-all: protocols embed-assets $(TARGET)
+all: protocols $(TARGET)
 
 # Generate protocol files first
 protocols: $(C_PROTOCOL_SRC) $(H_PROTOCOL_HDR)
 
-# Generate embedded assets
-embed-assets: $(EMBEDDED_ASSETS_H) $(EMBEDDED_ASSETS_C)
-
-$(EMBEDDED_ASSETS_H) $(EMBEDDED_ASSETS_C): $(EMBED_SCRIPT) assets/*.png
+# Generate embedded assets (manual target - run when assets change)
+embed-assets: 
 	./$(EMBED_SCRIPT)
 
 # Create build directories
@@ -77,8 +75,8 @@ $(OBJDIR):
 	mkdir -p $(OBJDIR)/utils
 	mkdir -p $(BUILDDIR)
 
-# Compile source files (depends on protocol headers and embedded assets)
-$(OBJDIR)/%.o: $(SRCDIR)/%.c $(H_PROTOCOL_HDR) $(EMBEDDED_ASSETS_H) | $(OBJDIR)
+# Compile source files (depends on protocol headers)
+$(OBJDIR)/%.o: $(SRCDIR)/%.c $(H_PROTOCOL_HDR) | $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Compile protocol files
@@ -98,7 +96,7 @@ $(C_PROTOCOL_SRC) $(H_PROTOCOL_HDR): $(PROTOCOLDIR)/wlr-layer-shell-unstable-v1.
 	wayland-scanner client-header $(PROTOCOLDIR)/wlr-foreign-toplevel-management-unstable-v1.xml $(PROTOCOLDIR)/wlr-foreign-toplevel-management-v1-client-protocol.h
 
 clean:
-	rm -rf $(BUILDDIR) $(C_PROTOCOL_SRC) $(H_PROTOCOL_HDR) $(EMBEDDED_ASSETS_H) $(EMBEDDED_ASSETS_C)
+	rm -rf $(BUILDDIR) $(C_PROTOCOL_SRC) $(H_PROTOCOL_HDR)
 
 # Development targets
 debug:

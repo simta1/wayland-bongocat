@@ -13,9 +13,8 @@ result
 *-protocol.h
 *-client-protocol.h
 
-# Generated embedded assets
-*embedded_assets.h
-*embedded_assets.c
+# Note: embedded_assets.c and embedded_assets.h are now committed to git
+# Run scripts/embed_assets.sh manually when assets change
 
 # IDE files
 .vscode/
