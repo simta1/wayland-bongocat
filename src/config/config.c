@@ -186,7 +186,16 @@ static bongocat_error_t config_parse_integer_key(config_t *config, const char *k
         config->overlay_opacity = int_value;
     } else if (strcmp(key, "enable_debug") == 0) {
         config->enable_debug = int_value;
-    } else {
+    } else if (strcmp(key, "monitor") == 0) {
+        // Reallocate new name for monitor output
+        config->output_name = realloc(config->output_name, strlen(value) + 1);
+        if (!config->output_name) {
+            bongocat_log_error("Failed to allocate memory for interface output");
+            return BONGOCAT_ERROR_MEMORY;
+        }
+        strcpy(config->output_name, value);
+    }
+    else {
         return BONGOCAT_ERROR_INVALID_PARAM; // Unknown key
     }
     
@@ -305,6 +314,7 @@ static bongocat_error_t config_parse_file(config_t *config, const char *config_f
 static void config_set_defaults(config_t *config) {
     *config = (config_t) {
         .screen_width = DEFAULT_SCREEN_WIDTH,  // Will be updated by Wayland detection
+        .output_name = NULL, // Will default to automatic one if kept null
         .bar_height = DEFAULT_BAR_HEIGHT,
         .asset_paths = {
             "assets/bongo-cat-both-up.png",

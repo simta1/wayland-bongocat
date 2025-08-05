@@ -16,6 +16,7 @@ typedef enum {
 
 typedef struct {
     int screen_width;
+    char *output_name;
     int bar_height;
     const char *asset_paths[NUM_FRAMES];
     char **keyboard_devices;

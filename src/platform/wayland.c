@@ -4,6 +4,7 @@
 #include <poll.h>
 #include <sys/time.h>
 #include "../protocols/wlr-foreign-toplevel-management-v1-client-protocol.h"
+#include "../protocols/xdg-output-unstable-v1-client-protocol.h"
 
 // =============================================================================
 // GLOBAL STATE AND CONFIGURATION
@@ -40,6 +41,39 @@ typedef struct {
 } screen_info_t;
 
 static screen_info_t screen_info = {0};
+static output_ref_t outputs[MAX_OUTPUTS];
+static size_t output_count = 0;
+static struct zxdg_output_manager_v1 *xdg_output_manager = NULL;
+
+// =============================================================================
+// ZXDG LISTENER IMPLEMENTATION
+// =============================================================================
+
+static void handle_xdg_output_name(void *data, struct zxdg_output_v1 *xdg_output __attribute__((unused)),
+                                   const char *name) {
+    output_ref_t *oref = data;
+    snprintf(oref->name_str, sizeof(oref->name_str), "%s", name);
+    oref->name_received = true;
+    bongocat_log_debug("xdg-output name received: %s", name);
+}
+
+static void handle_xdg_output_logical_position(void *data, struct zxdg_output_v1 *xdg_output,
+                                               int32_t x, int32_t y) {}
+static void handle_xdg_output_logical_size(void *data, struct zxdg_output_v1 *xdg_output,
+                                           int32_t width, int32_t height) {}
+static void handle_xdg_output_done(void *data, struct zxdg_output_v1 *xdg_output) {}
+
+static void handle_xdg_output_description(void *data, struct zxdg_output_v1 *xdg_output, const char *description) {
+    (void)data; (void)xdg_output; (void)description;
+}
+
+static const struct zxdg_output_v1_listener xdg_output_listener = {
+    .logical_position = handle_xdg_output_logical_position,
+    .logical_size = handle_xdg_output_logical_size,
+    .done = handle_xdg_output_done,
+    .name = handle_xdg_output_name,
+    .description = handle_xdg_output_description
+};
 
 // =============================================================================
 // FULLSCREEN DETECTION MODULE
@@ -388,10 +422,14 @@ static void registry_global(void *data __attribute__((unused)), struct wl_regist
         if (xdg_wm_base) {
             xdg_wm_base_add_listener(xdg_wm_base, &xdg_wm_base_listener, NULL);
         }
+    } else if (strcmp(iface, zxdg_output_manager_v1_interface.name) == 0) {
+        xdg_output_manager = wl_registry_bind(reg, name, &zxdg_output_manager_v1_interface, 3);
     } else if (strcmp(iface, wl_output_interface.name) == 0) {
-        if (!output) {
-            output = (struct wl_output *)wl_registry_bind(reg, name, &wl_output_interface, 2);
-            wl_output_add_listener(output, &output_listener, NULL);
+        if (output_count < MAX_OUTPUTS) {
+            outputs[output_count].name = name;
+            outputs[output_count].wl_output = wl_registry_bind(reg, name, &wl_output_interface, 2);
+            wl_output_add_listener(outputs[output_count].wl_output, &output_listener, NULL);
+            output_count++;
         }
     } else if (strcmp(iface, zwlr_foreign_toplevel_manager_v1_interface.name) == 0) {
         fs_detector.manager = (struct zwlr_foreign_toplevel_manager_v1 *)
@@ -426,6 +464,39 @@ static bongocat_error_t wayland_setup_protocols(void) {
     wl_registry_add_listener(registry, &reg_listener, NULL);
     wl_display_roundtrip(display);
 
+    if (xdg_output_manager) {
+        for (size_t i = 0; i < output_count; ++i) {
+            outputs[i].xdg_output = zxdg_output_manager_v1_get_xdg_output(xdg_output_manager, outputs[i].wl_output);
+            zxdg_output_v1_add_listener(outputs[i].xdg_output, &xdg_output_listener, &outputs[i]);
+        }
+
+        // Wait for all xdg_output events
+        wl_display_roundtrip(display);
+    }
+
+    output = NULL;
+    if (current_config->output_name) {
+        for (size_t i = 0; i < output_count; ++i) {
+            if (outputs[i].name_received &&
+                strcmp(outputs[i].name_str, current_config->output_name) == 0) {
+                output = outputs[i].wl_output;
+                bongocat_log_info("Matched output: %s", outputs[i].name_str);
+                break;
+                }
+        }
+
+        if (!output) {
+            bongocat_log_error("Could not find output named '%s', defaulting to first output",
+                               current_config->output_name);
+        }
+    }
+
+    // Fallback
+    if (!output && output_count > 0) {
+        output = outputs[0].wl_output;
+        bongocat_log_warning("Falling back to first output");
+    }
+
     if (!compositor || !shm || !layer_shell) {
         bongocat_log_error("Missing required Wayland protocols");
         wl_registry_destroy(registry);
@@ -458,9 +529,10 @@ static bongocat_error_t wayland_setup_surface(void) {
         return BONGOCAT_ERROR_WAYLAND;
     }
 
-    layer_surface = zwlr_layer_shell_v1_get_layer_surface(layer_shell, surface, NULL,
-                                                          ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY, 
-                                                          "bongocat-overlay");
+    layer_surface = zwlr_layer_shell_v1_get_layer_surface(layer_shell, surface, output,
+                                                      ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY,
+                                                      "bongocat-overlay");
+
     if (!layer_surface) {
         bongocat_log_error("Failed to create layer surface");
         return BONGOCAT_ERROR_WAYLAND;
@@ -644,6 +716,28 @@ void wayland_update_config(config_t *config) {
 
 void wayland_cleanup(void) {
     bongocat_log_info("Cleaning up Wayland resources");
+
+    if (outputs) {
+        for (size_t i = 0; i < output_count; ++i) {
+            if (outputs[i].xdg_output) {
+                printf("Destroying xdg_output %zu\n", i);
+                zxdg_output_v1_destroy(outputs[i].xdg_output);
+                outputs[i].xdg_output = NULL;
+            }
+            if (outputs[i].wl_output) {
+                printf("Destroying wl_output %zu\n", i);
+                wl_output_destroy(outputs[i].wl_output);
+                outputs[i].wl_output = NULL;
+            }
+        }
+        memset(outputs, 0, MAX_OUTPUTS);
+    }
+
+    if (xdg_output_manager) {
+        printf("Destroying xdg_output_manager\n");
+        zxdg_output_manager_v1_destroy(xdg_output_manager);
+        xdg_output_manager = NULL;
+    }
 
     if (buffer) {
         wl_buffer_destroy(buffer);
