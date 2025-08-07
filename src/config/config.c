@@ -415,6 +415,17 @@ void config_cleanup(void) {
     config_cleanup_devices();
 }
 
+void config_cleanup_full(config_t *config) {
+    if (!config) return;
+    
+    config_cleanup_devices();
+    
+    if (config->output_name) {
+        free(config->output_name);
+        config->output_name = NULL;
+    }
+}
+
 int get_screen_width(void) {
     // This function is now only used for initial config loading
     // The actual screen width detection happens in wayland_init

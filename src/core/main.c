@@ -237,15 +237,25 @@ static void config_reload_callback(const char *config_path) {
         return;
     }
     
-    // If successful, update the global config
-    config_t old_config = g_config;
+    // If successful, check if input devices changed before updating config
+    bool devices_changed = config_devices_changed(&g_config, &temp_config);
+    
+    // Clean up old output_name if it exists and is different
+    if (g_config.output_name && temp_config.output_name && 
+        strcmp(g_config.output_name, temp_config.output_name) != 0) {
+        free(g_config.output_name);
+    } else if (g_config.output_name && !temp_config.output_name) {
+        free(g_config.output_name);
+    }
+    
+    // Update the global config
     g_config = temp_config;
     
     // Update the running systems with new config
     wayland_update_config(&g_config);
     
     // Check if input devices changed and restart monitoring if needed
-    if (config_devices_changed(&old_config, &g_config)) {
+    if (devices_changed) {
         bongocat_log_info("Input devices changed, restarting input monitoring");
         bongocat_error_t input_result = input_restart_monitoring(g_config.keyboard_devices, 
                                                                 g_config.num_keyboard_devices, 
@@ -331,6 +341,7 @@ static void system_cleanup_and_exit(int exit_code) {
     input_cleanup();
     
     // Cleanup configuration
+    config_cleanup_full(&g_config);
     config_cleanup();
     
     // Print memory statistics in debug mode

@@ -717,27 +717,32 @@ void wayland_update_config(config_t *config) {
 void wayland_cleanup(void) {
     bongocat_log_info("Cleaning up Wayland resources");
 
-    if (outputs) {
-        for (size_t i = 0; i < output_count; ++i) {
-            if (outputs[i].xdg_output) {
-                printf("Destroying xdg_output %zu\n", i);
-                zxdg_output_v1_destroy(outputs[i].xdg_output);
-                outputs[i].xdg_output = NULL;
-            }
-            if (outputs[i].wl_output) {
-                printf("Destroying wl_output %zu\n", i);
-                wl_output_destroy(outputs[i].wl_output);
-                outputs[i].wl_output = NULL;
-            }
+    // First destroy xdg_output objects
+    for (size_t i = 0; i < output_count; ++i) {
+        if (outputs[i].xdg_output) {
+            bongocat_log_debug("Destroying xdg_output %zu", i);
+            zxdg_output_v1_destroy(outputs[i].xdg_output);
+            outputs[i].xdg_output = NULL;
         }
-        memset(outputs, 0, MAX_OUTPUTS);
     }
 
+    // Then destroy the manager
     if (xdg_output_manager) {
-        printf("Destroying xdg_output_manager\n");
+        bongocat_log_debug("Destroying xdg_output_manager");
         zxdg_output_manager_v1_destroy(xdg_output_manager);
         xdg_output_manager = NULL;
     }
+
+    // Finally destroy wl_output objects
+    for (size_t i = 0; i < output_count; ++i) {
+        if (outputs[i].wl_output) {
+            bongocat_log_debug("Destroying wl_output %zu", i);
+            wl_output_destroy(outputs[i].wl_output);
+            outputs[i].wl_output = NULL;
+        }
+    }
+    
+    output_count = 0;
 
     if (buffer) {
         wl_buffer_destroy(buffer);
@@ -760,10 +765,9 @@ void wayland_cleanup(void) {
         surface = NULL;
     }
 
-    if (output) {
-        wl_output_destroy(output);
-        output = NULL;
-    }
+    // Note: output is just a reference to one of the outputs[] entries
+    // It will be destroyed when we destroy the outputs[] array above
+    output = NULL;
 
     if (layer_shell) {
         zwlr_layer_shell_v1_destroy(layer_shell);

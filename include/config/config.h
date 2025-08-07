@@ -38,6 +38,7 @@ typedef struct {
 
 bongocat_error_t load_config(config_t *config, const char *config_file_path);
 void config_cleanup(void);
+void config_cleanup_full(config_t *config);
 int get_screen_width(void);
 
 #endif // CONFIG_H
