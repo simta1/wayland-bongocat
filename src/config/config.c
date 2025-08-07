@@ -379,18 +379,20 @@ bongocat_error_t load_config(config_t *config, const char *config_file_path) {
     // Initialize with defaults
     config_set_defaults(config);
     
-    // Set default keyboard device if none specified
-    bongocat_error_t result = config_set_default_devices(config);
-    if (result != BONGOCAT_SUCCESS) {
-        bongocat_log_error("Failed to set default keyboard devices: %s", bongocat_error_string(result));
-        return result;
-    }
-    
     // Parse config file and override defaults
-    result = config_parse_file(config, config_file_path);
+    bongocat_error_t result = config_parse_file(config, config_file_path);
     if (result != BONGOCAT_SUCCESS) {
         bongocat_log_error("Failed to parse configuration file: %s", bongocat_error_string(result));
         return result;
+    }
+
+    // Set default keyboard device if none specified
+    if (config->keyboard_devices == NULL || config->num_keyboard_devices == 0) {
+        result = config_set_default_devices(config);
+        if (result != BONGOCAT_SUCCESS) {
+            bongocat_log_error("Failed to set default keyboard devices: %s", bongocat_error_string(result));
+            return result;
+        }
     }
     
     // Validate and sanitize configuration
