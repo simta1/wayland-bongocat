@@ -287,8 +287,14 @@ bongocat_error_t input_restart_monitoring(char **device_paths, int num_devices, 
                 bongocat_log_debug("Previous input monitoring process terminated");
                 break;
             } else if (result == -1) {
-                bongocat_log_warning("Error waiting for input child process: %s", strerror(errno));
-                break;
+                if (errno == ECHILD) {
+                    // Child already reaped by signal handler - this is normal
+                    bongocat_log_debug("Input child process already cleaned up by signal handler");
+                    break;
+                } else {
+                    bongocat_log_warning("Error waiting for input child process: %s", strerror(errno));
+                    break;
+                }
             }
             
             usleep(100000); // Wait 100ms
@@ -357,8 +363,14 @@ void input_cleanup(void) {
                 bongocat_log_debug("Input monitoring child process terminated gracefully");
                 break;
             } else if (result == -1) {
-                bongocat_log_warning("Error waiting for input child process: %s", strerror(errno));
-                break;
+                if (errno == ECHILD) {
+                    // Child already reaped by signal handler - this is normal
+                    bongocat_log_debug("Input child process already cleaned up by signal handler");
+                    break;
+                } else {
+                    bongocat_log_warning("Error waiting for input child process: %s", strerror(errno));
+                    break;
+                }
             }
             
             usleep(100000); // Wait 100ms

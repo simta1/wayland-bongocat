@@ -23,12 +23,13 @@
 #include "../lib/stb_image.h"
 
 // Version
-#define BONGOCAT_VERSION "1.2.3"
+#define BONGOCAT_VERSION "1.2.4"
 
 // Common constants
 #define NUM_FRAMES 3
 #define DEFAULT_SCREEN_WIDTH 1920
 #define DEFAULT_BAR_HEIGHT 40
+#define MAX_OUTPUTS 8 // Maximum monitor outputs to store
 
 // Config watcher constants
 #define INOTIFY_EVENT_SIZE (sizeof(struct inotify_event))
@@ -43,6 +44,15 @@ typedef struct {
     char *config_path;
     void (*reload_callback)(const char *config_path);
 } ConfigWatcher;
+
+// Output monitor reference structure
+typedef struct {
+    struct wl_output *wl_output;
+    struct zxdg_output_v1 *xdg_output;
+    uint32_t name;         // Registry name
+    char name_str[128];   // From xdg-output
+    bool name_received;
+} output_ref_t;
 
 // Config watcher function declarations
 int config_watcher_init(ConfigWatcher *watcher, const char *config_path, void (*callback)(const char *));
