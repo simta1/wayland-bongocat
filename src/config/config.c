@@ -186,7 +186,16 @@ static bongocat_error_t config_parse_integer_key(config_t *config, const char *k
         config->overlay_opacity = int_value;
     } else if (strcmp(key, "enable_debug") == 0) {
         config->enable_debug = int_value;
-    } else {
+    } else if (strcmp(key, "monitor") == 0) {
+        // Reallocate new name for monitor output
+        config->output_name = realloc(config->output_name, strlen(value) + 1);
+        if (!config->output_name) {
+            bongocat_log_error("Failed to allocate memory for interface output");
+            return BONGOCAT_ERROR_MEMORY;
+        }
+        strcpy(config->output_name, value);
+    }
+    else {
         return BONGOCAT_ERROR_INVALID_PARAM; // Unknown key
     }
     
@@ -305,6 +314,7 @@ static bongocat_error_t config_parse_file(config_t *config, const char *config_f
 static void config_set_defaults(config_t *config) {
     *config = (config_t) {
         .screen_width = DEFAULT_SCREEN_WIDTH,  // Will be updated by Wayland detection
+        .output_name = NULL, // Will default to automatic one if kept null
         .bar_height = DEFAULT_BAR_HEIGHT,
         .asset_paths = {
             "assets/bongo-cat-both-up.png",
@@ -369,18 +379,20 @@ bongocat_error_t load_config(config_t *config, const char *config_file_path) {
     // Initialize with defaults
     config_set_defaults(config);
     
-    // Set default keyboard device if none specified
-    bongocat_error_t result = config_set_default_devices(config);
-    if (result != BONGOCAT_SUCCESS) {
-        bongocat_log_error("Failed to set default keyboard devices: %s", bongocat_error_string(result));
-        return result;
-    }
-    
     // Parse config file and override defaults
-    result = config_parse_file(config, config_file_path);
+    bongocat_error_t result = config_parse_file(config, config_file_path);
     if (result != BONGOCAT_SUCCESS) {
         bongocat_log_error("Failed to parse configuration file: %s", bongocat_error_string(result));
         return result;
+    }
+
+    // Set default keyboard device if none specified
+    if (config->keyboard_devices == NULL || config->num_keyboard_devices == 0) {
+        result = config_set_default_devices(config);
+        if (result != BONGOCAT_SUCCESS) {
+            bongocat_log_error("Failed to set default keyboard devices: %s", bongocat_error_string(result));
+            return result;
+        }
     }
     
     // Validate and sanitize configuration
@@ -401,6 +413,17 @@ bongocat_error_t load_config(config_t *config, const char *config_file_path) {
 
 void config_cleanup(void) {
     config_cleanup_devices();
+}
+
+void config_cleanup_full(config_t *config) {
+    if (!config) return;
+    
+    config_cleanup_devices();
+    
+    if (config->output_name) {
+        free(config->output_name);
+        config->output_name = NULL;
+    }
 }
 
 int get_screen_width(void) {

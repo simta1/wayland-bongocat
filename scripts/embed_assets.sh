@@ -1,4 +1,6 @@
 # Script to convert PNG assets to C header files for embedding
+# NOTE: This script should be run manually when assets change.
+# The generated files are committed to git and not generated during build.
 
 ASSETS_DIR="assets"
 OUTPUT_DIR="include/graphics"

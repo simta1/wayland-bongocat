@@ -18,6 +18,7 @@ result
 *.swp
 *.swo
 *~
+.idea/
 
 # Temporary files
 *.tmp

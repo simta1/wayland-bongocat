@@ -1,6 +1,8 @@
+#!/usr/bin/bash
+
 # Wayland Bongo Cat - Input Device Discovery Tool
 # Professional input device finder with comprehensive analysis
-# Version: 1.2.0
+# Version: 1.2.4
 
 set -euo pipefail
 
@@ -51,7 +53,7 @@ readonly TEST="[TEST]"
 
 # Script metadata
 readonly SCRIPT_NAME="bongocat-find-devices"
-readonly VERSION="1.2.0"
+readonly VERSION="1.2.4"
 
 # Command line options
 SHOW_ALL=false
@@ -80,6 +82,11 @@ usage() {
         printf "    This tool scans your system for input devices and provides configuration\n"
         printf "    suggestions for Wayland Bongo Cat. It identifies keyboards, checks\n"
         printf "    permissions, and generates ready-to-use configuration snippets.\n\n"
+        printf "${WHITE}MONITOR DETECTION:${NC}\n"
+        printf "    For multi-monitor setups, use these commands to find monitor names:\n"
+        printf "    • wlr-randr                    # List all monitors (recommended)\n"
+        printf "    • swaymsg -t get_outputs       # Sway compositor only\n"
+        printf "    • bongocat logs show detected monitors during startup\n\n"
     else
         cat << EOF
 ${SCRIPT_NAME} v${VERSION}
@@ -104,6 +111,12 @@ DESCRIPTION:
     This tool scans your system for input devices and provides configuration
     suggestions for Wayland Bongo Cat. It identifies keyboards, checks
     permissions, and generates ready-to-use configuration snippets.
+
+MONITOR DETECTION:
+    For multi-monitor setups, use these commands to find monitor names:
+    • wlr-randr                    # List all monitors (recommended)
+    • swaymsg -t get_outputs       # Sway compositor only
+    • bongocat logs show detected monitors during startup
 
 EOF
     fi
@@ -183,7 +196,7 @@ check_input_group() {
 # Get device accessibility status
 get_device_status() {
     local device="$1"
-    
+
     if [[ -r "$device" ]]; then
         echo -e "${GREEN}${CHECK} Accessible${NC}"
         return 0
@@ -198,11 +211,11 @@ get_device_type() {
     local device_name="$1"
     local capabilities="$2"
     local handlers="$3"
-    
+
     # Convert to lowercase for matching
     local name_lower=$(echo "$device_name" | tr '[:upper:]' '[:lower:]')
     local handlers_lower=$(echo "$handlers" | tr '[:upper:]' '[:lower:]')
-    
+
     # Check for keyboard indicators
     # Look for "kbd" handler (most reliable), keyboard in name, or keyboard-like capabilities
     if [[ "$handlers_lower" =~ kbd ]] || [[ "$name_lower" =~ keyboard ]] || [[ "$capabilities" =~ "120013" ]] || [[ "$capabilities" =~ "12001f" ]]; then
@@ -234,18 +247,18 @@ get_device_type() {
 parse_devices() {
     local show_all="$1"
     local devices=()
-    
+
     if [[ ! -r /proc/bus/input/devices ]]; then
         echo -e "${RED}${CROSS} Cannot read /proc/bus/input/devices${NC}" >&2
         echo -e "${INFO} Try running with sudo for full device information" >&2
         return 1
     fi
-    
+
     # Parse the devices file
     local current_name=""
     local current_handlers=""
     local current_capabilities=""
-    
+
     while IFS= read -r line; do
         if [[ "$line" =~ ^I: ]]; then
             # Reset for new device
@@ -261,10 +274,10 @@ parse_devices() {
         elif [[ "$line" =~ ^$ ]] && [[ -n "$current_name" ]]; then
             # End of device block, process it
             local device_type=$(get_device_type "$current_name" "$current_capabilities" "$current_handlers")
-            
+
             # Extract event handlers
             local event_handlers=($(echo "$current_handlers" | grep -o 'event[0-9]\+' || true))
-            
+
             # Filter devices based on show_all flag
             if [[ "$show_all" == "true" ]] || [[ "$device_type" =~ Keyboard ]]; then
                 for handler in "${event_handlers[@]}"; do
@@ -276,12 +289,12 @@ parse_devices() {
             fi
         fi
     done < /proc/bus/input/devices
-    
+
     # Handle last device if file doesn't end with empty line
     if [[ -n "$current_name" ]]; then
         local device_type=$(get_device_type "$current_name" "$current_capabilities" "$current_handlers")
         local event_handlers=($(echo "$current_handlers" | grep -o 'event[0-9]\+' || true))
-        
+
         if [[ "$show_all" == "true" ]] || [[ "$device_type" =~ Keyboard ]]; then
             for handler in "${event_handlers[@]}"; do
                 local device_path="/dev/input/$handler"
@@ -291,7 +304,7 @@ parse_devices() {
             done
         fi
     fi
-    
+
     printf '%s\n' "${devices[@]}"
 }
 
@@ -299,7 +312,7 @@ parse_devices() {
 display_devices() {
     local show_all="$1"
     local devices
-    
+
     if [[ "$GENERATE_CONFIG" == "false" ]]; then
         if [[ "$USE_COLORS" == "true" ]]; then
             echo -e "${SEARCH} ${WHITE}Scanning for input devices...${NC}"
@@ -308,12 +321,12 @@ display_devices() {
         fi
         echo
     fi
-    
+
     # Get device list
     if ! devices=$(parse_devices "$show_all"); then
         return 1
     fi
-    
+
     if [[ -z "$devices" ]]; then
         if [[ "$GENERATE_CONFIG" == "false" ]]; then
             echo -e "${WARNING} ${YELLOW}No input devices found${NC}"
@@ -321,14 +334,14 @@ display_devices() {
         fi
         return 1
     fi
-    
+
     local keyboard_devices=()
     local accessible_keyboards=()
-    
+
     if [[ "$GENERATE_CONFIG" == "false" ]]; then
         echo -e "${KEYBOARD} ${WHITE}Found Input Devices:${NC}"
     fi
-    
+
     # Process and display each device
     while IFS='|' read -r name path type; do
         if [[ "$GENERATE_CONFIG" == "false" ]]; then
@@ -336,14 +349,14 @@ display_devices() {
             echo -e "${BLUE}│${NC} ${WHITE}Device:${NC} $(printf "%-50s" "$name") ${BLUE}     │${NC}"
             echo -e "${BLUE}│${NC} ${WHITE}Path:${NC}   $(printf "%-50s" "$path") ${BLUE}     │${NC}"
             echo -e "${BLUE}│${NC} ${WHITE}Type:${NC}   $(printf "%-50s" "$type") ${BLUE}     │${NC}"
-            
+
             local status
             status=$(get_device_status "$path")
             echo -e "${BLUE}│${NC} ${WHITE}Status:${NC} $status $(printf "%*s" $((50 - ${#status} + 10)) "") ${BLUE}     │${NC}"
             echo -e "${BLUE}└─────────────────────────────────────────────────────────────────┘${NC}"
             echo
         fi
-        
+
         # Collect keyboard devices for configuration
         if [[ "$type" =~ Keyboard ]]; then
             keyboard_devices+=("$path|$name")
@@ -352,7 +365,7 @@ display_devices() {
             fi
         fi
     done <<< "$devices"
-    
+
     # Generate configuration suggestions
     if [[ "${#keyboard_devices[@]}" -gt 0 ]]; then
         generate_config_suggestions "${keyboard_devices[@]}"
@@ -361,7 +374,7 @@ display_devices() {
             echo -e "${WARNING} ${YELLOW}No keyboard devices found${NC}"
         fi
     fi
-    
+
     # Show permission help if needed
     if [[ "${#accessible_keyboards[@]}" -lt "${#keyboard_devices[@]}" ]] && [[ "$GENERATE_CONFIG" == "false" ]]; then
         show_permission_help
@@ -371,7 +384,7 @@ display_devices() {
 # Generate configuration suggestions
 generate_config_suggestions() {
     local devices=("$@")
-    
+
     if [[ "$GENERATE_CONFIG" == "true" ]]; then
         # Generate full config file
         cat << 'EOF'
@@ -404,7 +417,7 @@ EOF
         echo -e "${CONFIG} ${WHITE}Configuration Suggestions:${NC}"
         echo -e "${WHITE}Add these lines to your bongocat.conf:${NC}"
         echo
-        
+
         for device_info in "${devices[@]}"; do
             IFS='|' read -r path name <<< "$device_info"
             echo -e "${CYAN}keyboard_device=$path${NC}   ${WHITE}# $name${NC}"
@@ -436,30 +449,30 @@ test_devices() {
         echo -e "${INFO} Or: ${WHITE}sudo pacman -S evtest${NC} (Arch Linux)" >&2
         return 1
     fi
-    
+
     if ! check_permissions; then
         echo -e "${RED}${CROSS} Root privileges required for device testing${NC}" >&2
         echo -e "${INFO} Run with: ${WHITE}sudo $0 --test${NC}" >&2
         return 1
     fi
-    
+
     echo -e "${TEST} ${WHITE}Device Testing Mode${NC}"
     echo -e "${INFO} This will launch evtest for device testing"
     echo -e "${INFO} Press Ctrl+C to exit evtest when done"
     echo
-    
+
     exec evtest
 }
 
 # Main function
 main() {
     parse_args "$@"
-    
+
     if [[ "$TEST_DEVICES" == "true" ]]; then
         test_devices
         return $?
     fi
-    
+
     print_header
     display_devices "$SHOW_ALL"
 }
