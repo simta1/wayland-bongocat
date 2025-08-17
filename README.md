@@ -1,7 +1,7 @@
 # Bongo Cat Wayland Overlay
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-1.2.3-blue.svg)](https://github.com/saatvik333/wayland-bongocat/releases)
+[![Version](https://img.shields.io/badge/version-1.2.4-blue.svg)](https://github.com/saatvik333/wayland-bongocat/releases)
 
 A delightful Wayland overlay that displays an animated bongo cat reacting to your keyboard input! Perfect for streamers, content creators, or anyone who wants to add some fun to their desktop.
 
@@ -15,6 +15,7 @@ A delightful Wayland overlay that displays an animated bongo cat reacting to you
 - **⚡ Performance Optimized** - Adaptive monitoring and batch processing (v1.2.0)
 - **🖥️ Screen Detection** - Automatic screen detection for all sizes and orientations (v1.2.2)
 - **🎮 Smart Fullscreen Detection** - Automatically hides during fullscreen applications (v1.2.3)
+- **🖥️ Multi-Monitor Support** - Choose which monitor to display on in multi-monitor setups (v1.2.4)
 - **💾 Lightweight** - Minimal resource usage (~7MB RAM)
 - **🎛️ Multi-device Support** - Monitor multiple keyboards simultaneously
 - **🏗️ Cross-platform** - Works on x86_64 and ARM64
@@ -145,6 +146,9 @@ test_animation_interval=3        # Test animation every N seconds (0=off)
 keyboard_device=/dev/input/event4
 keyboard_device=/dev/input/event20  # External/Bluetooth keyboard
 
+# Multi-monitor support
+monitor=eDP-1                    # Specify which monitor to display on (optional)
+
 # Debug
 enable_debug=1                   # Show debug messages
 ```
@@ -162,6 +166,7 @@ enable_debug=1                   # Show debug messages
 | `keypress_duration`       | Integer | 50-5000           | 100                 | Animation duration after keypress (ms)        |
 | `test_animation_interval` | Integer | 0-60              | 3                   | Test animation interval (seconds, 0=disabled) |
 | `keyboard_device`         | String  | Valid path        | `/dev/input/event4` | Input device path (multiple allowed)          |
+| `monitor`                 | String  | Monitor name      | Auto-detect         | Monitor to display on (e.g., "eDP-1", "HDMI-A-1") |
 | `enable_debug`            | Boolean | 0 or 1            | 0                   | Enable debug logging                          |
 
 ## 🔧 Usage
@@ -243,7 +248,7 @@ The `bongocat-find-devices` tool provides professional input device analysis wit
 $ bongocat-find-devices
 
 ╔══════════════════════════════════════════════════════════════════╗
-║ Wayland Bongo Cat - Input Device Discovery v1.2.3                ║
+║ Wayland Bongo Cat - Input Device Discovery v1.2.4                ║
 ╚══════════════════════════════════════════════════════════════════╝
 
 [SCAN] Scanning for input devices...
@@ -308,7 +313,7 @@ bongocat-find-devices --help
 - **Storage:** ~0.4MB executable size
 - **Compositor:** Wayland with layer shell protocol support
 
-### Performance Metrics (v1.2.3)
+### Performance Metrics (v1.2.4)
 
 - **Input Latency:** <1ms with batch processing
 - **CPU Usage:** <1% on modern systems
@@ -376,6 +381,39 @@ sudo evtest /dev/input/event4
 </details>
 
 <details>
+<summary>Multi-monitor setup issues</summary>
+
+**Finding monitor names:**
+
+```bash
+# Using wlr-randr (recommended)
+wlr-randr
+
+# Using swaymsg (Sway only)
+swaymsg -t get_outputs
+
+# Check bongocat logs for detected monitors
+bongocat --watch-config  # Look for "xdg-output name received" messages
+```
+
+**Configuration:**
+
+```ini
+# Specify exact monitor name
+monitor=eDP-1        # Laptop screen
+monitor=HDMI-A-1     # External HDMI monitor
+monitor=DP-1         # DisplayPort monitor
+```
+
+**Troubleshooting:**
+
+- If monitor name is wrong, bongocat falls back to first available monitor
+- Monitor names are case-sensitive
+- Remove or comment out `monitor=` line to use auto-detection
+
+</details>
+
+<details>
 <summary>Build errors</summary>
 
 **Common fixes:**
@@ -412,11 +450,12 @@ wayland-bongocat/
 └── nix/               # NixOS integration
 ```
 
-### Key Features (v1.2.3)
+### Key Features (v1.2.4)
 
 - **Screen Detection** -> Automatic screen width/orientation detection
 - **Fullscreen Detection** -> Smart hiding during fullscreen applications
 - **Enhanced Artwork** -> Custom-drawn animations with improved visual quality
+- **Multi-Monitor Support** -> Choose specific monitor for display in multi-monitor setups
 
 ## 🤝 Contributing
 
@@ -451,4 +490,4 @@ Built with ❤️ for the Wayland community. Special thanks to:
 
 ---
 
-**₍^. .^₎ Wayland Bongo Cat Overlay v1.2.3** - Making desktops more delightful, one keystroke at a time!
+**₍^. .^₎ Wayland Bongo Cat Overlay v1.2.4** - Making desktops more delightful, one keystroke at a time!
