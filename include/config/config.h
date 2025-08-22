@@ -14,6 +14,12 @@ typedef enum {
     LAYER_OVERLAY = 1
 } layer_type_t;
 
+typedef enum {
+    ALIGN_LEFT = -1,
+    ALIGN_CENTER = 0,
+    ALIGN_RIGHT = 1,
+} align_type_t;
+
 typedef struct {
     int screen_width;
     char *output_name;
@@ -34,6 +40,7 @@ typedef struct {
     int enable_debug;
     layer_type_t layer;
     overlay_position_t overlay_position;
+    align_type_t cat_align;
 } config_t;
 
 bongocat_error_t load_config(config_t *config, const char *config_file_path);
