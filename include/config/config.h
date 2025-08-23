@@ -15,6 +15,11 @@ typedef enum {
 } layer_type_t;
 
 typedef struct {
+    int hour;
+    int min;
+} config_time_t;
+
+typedef struct {
     int screen_width;
     char *output_name;
     int bar_height;
@@ -34,6 +39,11 @@ typedef struct {
     int enable_debug;
     layer_type_t layer;
     overlay_position_t overlay_position;
+
+    int enable_scheduled_sleep;
+    config_time_t sleep_begin;
+    config_time_t sleep_end;
+    int idle_sleep_timeout_sec;
 } config_t;
 
 bongocat_error_t load_config(config_t *config, const char *config_file_path);
