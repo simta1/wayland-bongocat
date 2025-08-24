@@ -1,39 +1,25 @@
-# Nix Support for Wayland Bongo Cat
-
-This directory contains all Nix-related files for the wayland-bongocat project.
-
+# Nix/NixOS Support
 ## Files
-
+- **`NIXOS.md`** - Comprehensive installation guide for Nix/NixOS users
 - **`default.nix`** - Main package derivation
-- **`shell.nix`** - Development environment
 - **`nixos-module.nix`** - NixOS system module
-- **`NIXOS.md`** - Comprehensive NixOS installation guide
-- **`test-nix-build.sh`** - Test script for validating builds
+- **`shell.nix`** - Development environment
+- **`scripts/test-nix-build.sh`** - Test script for validating builds
 
 ## Quick Usage
-
+Run these commands from the root directory of the project where `flake.nix` is.
 ```bash
-# Build the package
-nix-build default.nix
-
 # Enter development shell
-nix-shell shell.nix
+nix develop
 
-# Test all builds
-./test-nix-build.sh
-```
-
-## With Flakes (from project root)
-
-```bash
 # Build
 nix build
 
-# Develop
-nix develop
+# Build and run
+nix run ./#default
 
-# Run
-nix run .
+# Test all Nix builds
+./scripts/test-nix-build.sh
 ```
 
-For detailed instructions, see [NIXOS.md](NIXOS.md).
+See [NIXOS.md](NIXOS.md) for further information.

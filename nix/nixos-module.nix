@@ -13,12 +13,13 @@ with lib; let
     text = ''
       # Auto-generated config for `wayland-bongocat`
 
-      # Position
+      # Cat
       cat_x_offset=${toString cfg.catXOffset}
       cat_y_offset=${toString cfg.catYOffset}
-
-      # Size
       cat_height=${toString cfg.catHeight}
+
+      # Overlay
+      overlay_position=${toString cfg.overlayPosition}
       overlay_height=${toString cfg.overlayHeight}
 
       # Animations
@@ -45,10 +46,16 @@ with lib; let
 in {
   meta.maintainers = with lib.maintainers; [];
   options.programs.wayland-bongocat = {
-    enable = mkEnableOption "wayland-bongocat overlay";
+    enable = mkOption {
+      type = types.bool;
+      default = false;
+      example = true;
+      description = "Enable `wayland-bongocat` overlay";
+    };
     autostart = mkOption {
       type = types.bool;
       default = false;
+      example = true;
       description = "Enable and automatically start `bongocat-wayland` as a service on login";
     };
 
@@ -62,18 +69,27 @@ in {
     enableDebug = mkOption {
       type = types.bool;
       default = false;
+      example = true;
       description = "Enable debug logging";
     };
 
     # Overlay
+    overlayPosition = mkOption {
+      type = types.str;
+      default = "top";
+      example = "bottom";
+      description = "Bongocat overlay position on screen - `top` or `bottom`";
+    };
     overlayHeight = mkOption {
       type = types.int;
       default = 60;
+      example = 70;
       description = "Height of the entire overlay bar";
     };
     overlayOpacity = mkOption {
       type = types.int;
       default = 0;
+      example = 20;
       description = "Overlay background opacity (0-255, 0 = transparent)";
     };
 
@@ -81,11 +97,13 @@ in {
     catXOffset = mkOption {
       type = types.int;
       default = 120;
+      example = 200;
       description = "Horizontal offset from center position (pixels)";
     };
     catYOffset = mkOption {
       type = types.int;
       default = 0;
+      example = 10;
       description = "Vertical offset from center position (pixels)";
     };
 
@@ -93,6 +111,7 @@ in {
     catHeight = mkOption {
       type = types.int;
       default = 40;
+      example = 50;
       description = "Height of the bongo cat in pixels";
     };
 
@@ -100,21 +119,25 @@ in {
     idleFrame = mkOption {
       type = types.int;
       default = 0;
+      example = 1;
       description = "Frame to use when idle (0, 1, or 2)";
     };
     keypressDuration = mkOption {
       type = types.int;
       default = 150;
+      example = 100;
       description = "Animation duration after keypress (ms)";
     };
     testAnimationDuration = mkOption {
       type = types.int;
       default = 200;
+      example = 100;
       description = "Test animation duration (ms)";
     };
     testAnimationInterval = mkOption {
       type = types.int;
       default = 0;
+      example = 10;
       description = "How often to trigger test animation (seconds, 0 = disabled)";
     };
 
@@ -122,6 +145,7 @@ in {
     fps = mkOption {
       type = types.int;
       default = 60;
+      example = 120;
       description = "Animation framerate (FPS)";
     };
 
@@ -140,12 +164,6 @@ in {
       cfg.package
 
       # Helper scripts
-      # For finding input devices
-      (pkgs.writeScriptBin "bongocat-find-devices" ''
-        #!${pkgs.bash}/bin/bash
-        exec ${cfg.package}/bin/bongocat-find-devices "$@"
-      '')
-
       # For starting `wayland-bongocat` using the config file defined with Nix
       (pkgs.writeScriptBin "bongocat-exec" ''
         #!${pkgs.bash}/bin/bash

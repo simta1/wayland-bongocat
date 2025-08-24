@@ -1,95 +1,49 @@
 {
   lib,
   stdenv,
-  gcc,
-  gnumake,
   pkg-config,
   wayland,
   wayland-protocols,
   wayland-scanner,
 }:
-stdenv.mkDerivation {
+stdenv.mkDerivation (finalAttrs: {
   pname = "wayland-bongocat";
-  version = "1.2.1";
-
+  version = "1.2.4";
   src = ../.;
 
-  nativeBuildInputs = [
-    gcc
-    gnumake
-    pkg-config
-    wayland-scanner
-    wayland-protocols
-  ];
-
+  # Build toolchain and dependencies
+  strictDeps = true;
+  nativeBuildInputs = [pkg-config wayland-scanner];
   buildInputs = [
     wayland
     wayland-protocols
+    wayland-scanner
   ];
 
+  # Build phases
+  # Ensure that the Makefile has the correct directory with the Wayland protocols
   preBuild = ''
-    # Ensure build directory exists
-    mkdir -p build/obj
-
-    # Make scripts executable
-    chmod +x scripts/embed_assets.sh
-    chmod +x scripts/find_input_devices.sh
-  '';
-
-  buildPhase = ''
-    runHook preBuild
-
-    # Ensure that the Makefile has the correct directory with the Wayland protocols
     export WAYLAND_PROTOCOLS_DIR="${wayland-protocols}/share/wayland-protocols"
-
-    # Generate protocol files, embedded assets and build the app
-    make protocols
-    make embed-assets
-    make release
-
-    runHook postBuild
   '';
 
+  makeFlags = ["release"];
   installPhase = ''
     runHook preInstall
 
-    # Create directories
-    mkdir -p $out/bin
-    mkdir -p $out/share/bongocat
-    mkdir -p $out/share/doc/bongocat
-
-    # Install binary
-    cp build/bongocat $out/bin/
-
-    # Install configuration example
-    cp bongocat.conf $out/share/bongocat/bongocat.conf.example
-
-    # Install helper script
-    cp scripts/find_input_devices.sh $out/bin/bongocat-find-devices
-
-    # Install documentation
-    cp README.md $out/share/doc/bongocat/
-    cp -r assets $out/share/doc/bongocat/
+    # Install binaries
+    install -Dm755 build/bongocat $out/bin/${finalAttrs.meta.mainProgram}
+    install -Dm755 scripts/find_input_devices.sh $out/bin/bongocat-find-devices
 
     runHook postInstall
   '';
 
-  meta = with lib; {
-    description = "A Wayland overlay that displays an animated bongo cat reacting to keyboard input";
-    longDescription = ''
-      Bongo Cat Wayland Overlay is a fun desktop companion that shows an animated
-      bongo cat reacting to your keyboard input in real-time. Features include:
-
-      - Real-time keyboard input monitoring from multiple devices
-      - Click-through overlay that doesn't interfere with your workflow
-      - Configurable positioning, size, and animation settings
-      - Support for multiple input devices (built-in + external keyboards)
-      - Professional C11 codebase with comprehensive error handling
-    '';
+  # Package information
+  meta = {
+    description = "Delightful Wayland overlay that displays an animated bongo cat reacting to your keyboard input!";
     homepage = "https://github.com/saatvik333/wayland-bongocat";
-    license = licenses.mit;
-    maintainers = [];
-    platforms = platforms.linux;
+    license = lib.licenses.mit;
+    maintainers = with lib.maintainers; [voxi0];
     mainProgram = "bongocat";
+    platforms = lib.platforms.linux;
   };
-}
+})

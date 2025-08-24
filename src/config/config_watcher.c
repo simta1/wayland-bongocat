@@ -1,15 +1,17 @@
 #define _POSIX_C_SOURCE 200809L
 #define _DEFAULT_SOURCE
-#include "bongocat.h"
-#include "error.h"
-#include "config.h"
+#include "core/bongocat.h"
+#include "utils/error.h"
+#include "config/config.h"
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 #include <sys/select.h>
 
 static void *config_watcher_thread(void *arg) {
     ConfigWatcher *watcher = (ConfigWatcher *)arg;
     char buffer[INOTIFY_BUF_LEN];
+    time_t last_reload_time = 0;
     
     bongocat_log_info("Config watcher started for: %s", watcher->config_path);
     
@@ -45,12 +47,24 @@ static void *config_watcher_thread(void *arg) {
                 continue;
             }
             
+            bool should_reload = false;
             ssize_t i = 0;
             while (i < length) {
                 struct inotify_event *event = (struct inotify_event *)&buffer[i];
                 
                 if (event->mask & (IN_MODIFY | IN_MOVED_TO)) {
+                    should_reload = true;
+                }
+                
+                i += INOTIFY_EVENT_SIZE + event->len;
+            }
+            
+            // Debounce: only reload if at least 200ms have passed since last reload
+            if (should_reload) {
+                time_t current_time = time(NULL);
+                if (current_time - last_reload_time >= 1) { // 1 second debounce
                     bongocat_log_info("Config file changed, reloading...");
+                    last_reload_time = current_time;
                     
                     // Small delay to ensure file write is complete
                     usleep(100000); // 100ms
@@ -59,8 +73,6 @@ static void *config_watcher_thread(void *arg) {
                         watcher->reload_callback(watcher->config_path);
                     }
                 }
-                
-                i += INOTIFY_EVENT_SIZE + event->len;
             }
         }
     }

@@ -1,8 +1,8 @@
 #ifndef INPUT_H
 #define INPUT_H
 
-#include "bongocat.h"
-#include "error.h"
+#include "core/bongocat.h"
+#include "utils/error.h"
 
 extern int *any_key_pressed;
 

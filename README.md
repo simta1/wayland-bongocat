@@ -1,7 +1,7 @@
 # Bongo Cat Wayland Overlay
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-1.2.1-blue.svg)](https://github.com/saatvik333/wayland-bongocat/releases)
+[![Version](https://img.shields.io/badge/version-1.2.4-blue.svg)](https://github.com/saatvik333/wayland-bongocat/releases)
 
 A delightful Wayland overlay that displays an animated bongo cat reacting to your keyboard input! Perfect for streamers, content creators, or anyone who wants to add some fun to their desktop.
 
@@ -10,13 +10,14 @@ A delightful Wayland overlay that displays an animated bongo cat reacting to you
 ## ✨ Features
 
 - **🎯 Real-time Animation** - Bongo cat reacts instantly to keyboard input
-- **🔥 Hot-Reload Configuration** - Modify settings without restarting (v1.2.1)
-- **🔄 Dynamic Device Detection** - Automatically detects Bluetooth/USB keyboards (v1.2.1)
-- **⚡ Performance Optimized** - Adaptive monitoring and batch processing (v1.2.1)
-- **🖥️ Wayland Native** - Built specifically for Wayland compositors
-- **💾 Lightweight** - Minimal resource usage (~2MB RAM)
+- **🔥 Hot-Reload Configuration** - Modify settings without restarting (v1.2.0)
+- **🔄 Dynamic Device Detection** - Automatically detects Bluetooth/USB keyboards (v1.2.0)
+- **⚡ Performance Optimized** - Adaptive monitoring and batch processing (v1.2.0)
+- **🖥️ Screen Detection** - Automatic screen detection for all sizes and orientations (v1.2.2)
+- **🎮 Smart Fullscreen Detection** - Automatically hides during fullscreen applications (v1.2.3)
+- **🖥️ Multi-Monitor Support** - Choose which monitor to display on in multi-monitor setups (v1.2.4)
+- **💾 Lightweight** - Minimal resource usage (~7MB RAM)
 - **🎛️ Multi-device Support** - Monitor multiple keyboards simultaneously
-- **🎨 Embedded Assets** - No external dependencies
 - **🏗️ Cross-platform** - Works on x86_64 and ARM64
 
 ## 🚀 Installation
@@ -145,19 +146,12 @@ test_animation_interval=3        # Test animation every N seconds (0=off)
 keyboard_device=/dev/input/event4
 keyboard_device=/dev/input/event20  # External/Bluetooth keyboard
 
+# Multi-monitor support
+monitor=eDP-1                    # Specify which monitor to display on (optional)
+
 # Debug
 enable_debug=1                   # Show debug messages
 ```
-
-### Hot-Reload Features (v1.2.1)
-
-When running with `--watch-config`:
-
-- ✨ **Real-time updates** - Edit config file, see changes instantly
-- 🔄 **Dynamic devices** - Bluetooth keyboards auto-detected when connected
-- 🎛️ **Visual feedback** - Opacity, size, and position changes apply immediately
-- 🚫 **No restart needed** - Perfect for fine-tuning your setup
-
 ### Configuration Reference
 
 | Setting                   | Type    | Range             | Default             | Description                                   |
@@ -171,6 +165,7 @@ When running with `--watch-config`:
 | `keypress_duration`       | Integer | 50-5000           | 100                 | Animation duration after keypress (ms)        |
 | `test_animation_interval` | Integer | 0-60              | 3                   | Test animation interval (seconds, 0=disabled) |
 | `keyboard_device`         | String  | Valid path        | `/dev/input/event4` | Input device path (multiple allowed)          |
+| `monitor`                 | String  | Monitor name      | Auto-detect         | Monitor to display on (e.g., "eDP-1", "HDMI-A-1") |
 | `enable_debug`            | Boolean | 0 or 1            | 0                   | Enable debug logging                          |
 
 ## 🔧 Usage
@@ -219,11 +214,6 @@ bongocat --toggle
 - libwayland-client
 - wayland-protocols
 - wayland-scanner
-
-**Optional:**
-
-- hyprctl (for automatic screen detection on Hyprland)
-
 ### Build Process
 
 ```bash
@@ -256,7 +246,7 @@ The `bongocat-find-devices` tool provides professional input device analysis wit
 $ bongocat-find-devices
 
 ╔══════════════════════════════════════════════════════════════════╗
-║ Wayland Bongo Cat - Input Device Discovery v1.2.1                ║
+║ Wayland Bongo Cat - Input Device Discovery v1.2.4                ║
 ╚══════════════════════════════════════════════════════════════════╝
 
 [SCAN] Scanning for input devices...
@@ -317,24 +307,25 @@ bongocat-find-devices --help
 ### System Requirements
 
 - **CPU:** Any modern x86_64 or ARM64 processor
-- **RAM:** ~2MB runtime usage
-- **Storage:** ~1.2MB executable size
+- **RAM:** ~7MB runtime usage
+- **Storage:** ~0.4MB executable size
 - **Compositor:** Wayland with layer shell protocol support
 
-### Performance Metrics (v1.2.1)
+### Performance Metrics (v1.2.4)
 
 - **Input Latency:** <1ms with batch processing
 - **CPU Usage:** <1% on modern systems
 - **Device Monitoring:** Adaptive 5-30 second intervals
 - **Memory:** Optimized with leak detection
+- **Fullscreen Detection:** Intelligent hiding with minimal overhead
 
 ### Tested Compositors
 
-- ✅ **Hyprland** - Full support with screen detection
+- ✅ **Hyprland** - Full support
 - ✅ **Sway** - Full support
 - ✅ **Wayfire** - Compatible
-- ⚠️ **KDE Wayland** - Limited layer shell support
-- ❌ **GNOME Wayland** - No layer shell support
+- ✅ **KDE Wayland** - Compatiable
+- ❌ **GNOME Wayland** - Support Unknown
 
 ## 🐛 Troubleshooting
 
@@ -388,6 +379,38 @@ sudo evtest /dev/input/event4
 </details>
 
 <details>
+<summary>Multi-monitor setup issues</summary>
+
+**Finding monitor names:**
+
+```bash
+# Using wlr-randr (recommended)
+wlr-randr
+
+# Using swaymsg (Sway only)
+swaymsg -t get_outputs
+
+# Check bongocat logs for detected monitors
+bongocat --watch-config  # Look for "xdg-output name received" messages
+```
+
+**Configuration:**
+
+```ini
+# Specify exact monitor name
+monitor=eDP-1        # Laptop screen
+monitor=HDMI-A-1     # External HDMI monitor
+monitor=DP-1         # DisplayPort monitor
+```
+
+**Troubleshooting:**
+
+- If monitor name is wrong, bongocat falls back to first available monitor
+- Monitor names are case-sensitive
+- Remove or comment out `monitor=` line to use auto-detection
+</details>
+
+<details>
 <summary>Build errors</summary>
 
 **Common fixes:**
@@ -424,13 +447,12 @@ wayland-bongocat/
 └── nix/               # NixOS integration
 ```
 
-### Key Features (v1.2.1)
+### Key Features (v1.2.4)
 
-- **Hot-reload system** using inotify file monitoring
-- **Dynamic device detection** with adaptive intervals
-- **Batch event processing** for improved performance
-- **Thread-safe configuration** management
-- **Optimized I/O** with larger buffers
+- **Screen Detection** -> Automatic screen width/orientation detection
+- **Fullscreen Detection** -> Smart hiding during fullscreen applications
+- **Enhanced Artwork** -> Custom-drawn animations with improved visual quality
+- **Multi-Monitor Support** -> Choose specific monitor for display in multi-monitor setups
 
 ## 🤝 Contributing
 
@@ -460,8 +482,9 @@ MIT License - see [LICENSE](LICENSE) file for details.
 Built with ❤️ for the Wayland community. Special thanks to:
 
 - Redditor: [u/akonzu](https://www.reddit.com/user/akonzu/) for the inspiration
+- [@Shreyabardia](https://github.com/Shreyabardia) for the beautiful custom-drawn bongo cat artwork
 - All the contributors and users
 
 ---
 
-**₍^. .^₎ Wayland Bongo Cat Overlay v1.2.1** - Making desktops more delightful, one keystroke at a time!
+**₍^. .^₎ Wayland Bongo Cat Overlay v1.2.4** - Making desktops more delightful, one keystroke at a time!
