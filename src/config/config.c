@@ -205,16 +205,7 @@ static bongocat_error_t config_parse_integer_key(config_t *config, const char *k
         config->enable_scheduled_sleep = int_value;
     } else if (strcmp(key, "idle_sleep_timeout") == 0) {
         config->idle_sleep_timeout_sec = int_value;
-    } else if (strcmp(key, "monitor") == 0) {
-        // Reallocate new name for monitor output
-        config->output_name = realloc(config->output_name, strlen(value) + 1);
-        if (!config->output_name) {
-            bongocat_log_error("Failed to allocate memory for interface output");
-            return BONGOCAT_ERROR_MEMORY;
-        }
-        strcpy(config->output_name, value);
-    }
-    else {
+    } else {
         return BONGOCAT_ERROR_INVALID_PARAM; // Unknown key
     }
 
@@ -240,6 +231,61 @@ static bongocat_error_t config_parse_enum_key(config_t *config, const char *key,
             bongocat_log_warning("Invalid overlay_position '%s', using 'top'", value);
             config->overlay_position = POSITION_TOP;
         }
+    } else if (strcmp(key, "cat_align") == 0) {
+        if (strcmp(value, "left") == 0) {
+            config->cat_align = ALIGN_LEFT;
+        } else if (strcmp(value, "center") == 0) {
+            config->cat_align = ALIGN_CENTER;
+        } else if (strcmp(value, "right") == 0) {
+            config->cat_align = ALIGN_RIGHT;
+        } else {
+            bongocat_log_warning("Invalid cat_align '%s', using 'center'", value);
+            config->cat_align = ALIGN_CENTER;
+        }
+    } else {
+        return BONGOCAT_ERROR_INVALID_PARAM; // Unknown key
+    }
+
+    return BONGOCAT_SUCCESS;
+}
+
+static bongocat_error_t config_parse_time_key(config_t *config, const char *key, const char *value) {
+    // Only try to parse time for time-related keys
+    if (strcmp(key, "sleep_begin") != 0 && strcmp(key, "sleep_end") != 0) {
+        return BONGOCAT_ERROR_INVALID_PARAM; // Not a time key
+    }
+
+    int hour, min;
+    if (sscanf(value, "%d:%d", &hour, &min) != 2) {
+        bongocat_log_warning("Invalid time format '%s', expected HH:MM", value);
+        return BONGOCAT_ERROR_INVALID_PARAM;
+    }
+
+    if (hour < 0 || hour > 23 || min < 0 || min > 59) {
+        bongocat_log_warning("Invalid time values '%s', hour must be 0-23, minute must be 0-59", value);
+        return BONGOCAT_ERROR_INVALID_PARAM;
+    }
+
+    if (strcmp(key, "sleep_begin") == 0) {
+        config->sleep_begin.hour = hour;
+        config->sleep_begin.min = min;
+    } else if (strcmp(key, "sleep_end") == 0) {
+        config->sleep_end.hour = hour;
+        config->sleep_end.min = min;
+    }
+
+    return BONGOCAT_SUCCESS;
+}
+
+static bongocat_error_t config_parse_string_key(config_t *config, const char *key, const char *value) {
+    if (strcmp(key, "monitor") == 0) {
+        // Reallocate new name for monitor output
+        config->output_name = realloc(config->output_name, strlen(value) + 1);
+        if (!config->output_name) {
+            bongocat_log_error("Failed to allocate memory for interface output");
+            return BONGOCAT_ERROR_MEMORY;
+        }
+        strcpy(config->output_name, value);
     } else {
         return BONGOCAT_ERROR_INVALID_PARAM; // Unknown key
     }
@@ -258,6 +304,11 @@ static bongocat_error_t config_parse_key_value(config_t *config, const char *key
         return BONGOCAT_SUCCESS;
     }
 
+
+    // Try time keys
+    if (config_parse_time_key(config, key, value) == BONGOCAT_SUCCESS) {
+        return BONGOCAT_SUCCESS;
+    }
 
     // Try string keys
     if (config_parse_string_key(config, key, value) == BONGOCAT_SUCCESS) {
