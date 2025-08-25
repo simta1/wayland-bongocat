@@ -16,7 +16,7 @@ A delightful Wayland overlay that displays an animated bongo cat reacting to you
 - **🖥️ Screen Detection** - Automatic screen detection for all sizes and orientations (v1.2.2)
 - **🎮 Smart Fullscreen Detection** - Automatically hides during fullscreen applications (v1.2.3)
 - **🖥️ Multi-Monitor Support** - Choose which monitor to display on in multi-monitor setups (v1.2.4)
-- **😴 Sleep Mode** - Scheduled or idle-based sleep mode with custom timing (1.2.5)
+- **😴 Sleep Mode** - Scheduled or idle-based sleep mode with custom timing (v1.2.5)
 - **🎨 Customizable Appearance** - Fine-tune position, size, alignment, and opacity
 - **💾 Lightweight** - Minimal resource usage (~7MB RAM)
 - **🎛️ Multi-device Support** - Monitor multiple keyboards simultaneously
