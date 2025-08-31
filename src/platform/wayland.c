@@ -525,6 +525,11 @@ static bongocat_error_t wayland_setup_protocols(void) {
             bongocat_log_warning("Using default screen width: %d", DEFAULT_SCREEN_WIDTH);
             current_config->screen_width = DEFAULT_SCREEN_WIDTH;
         }
+
+        if (screen_info.screen_height > 0) {
+            current_config->bar_height = screen_info.screen_height;
+            bongocat_log_info("Detected screen height: %d (expanding bar_height)", screen_info.screen_height);
+        }
     } else {
         bongocat_log_warning("No output found, using default screen width: %d", DEFAULT_SCREEN_WIDTH);
         current_config->screen_width = DEFAULT_SCREEN_WIDTH;
